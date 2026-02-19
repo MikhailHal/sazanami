@@ -4,7 +4,7 @@
     <strong>Affected Test Selection for Kotlin</strong>
   </p>
   <p align="center">
-    <a href="https://plugins.gradle.org/plugin/io.github.sonarkt"><img src="https://img.shields.io/gradle-plugin-portal/v/io.github.sonarkt?style=flat-square&logo=gradle&label=Gradle%20Plugin" alt="Gradle Plugin Portal"></a>
+    <a href="https://plugins.gradle.org/plugin/io.github.mikhailhal.sonarkt"><img src="https://img.shields.io/gradle-plugin-portal/v/io.github.mikhailhal.sonarkt?style=flat-square&logo=gradle&label=Gradle%20Plugin" alt="Gradle Plugin Portal"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License"></a>
     <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.1.20-7F52FF.svg?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"></a>
     <a href="#"><img src="https://img.shields.io/github/actions/workflow/status/MikhailHal/sonar-kt/ci.yml?style=flat-square&logo=github" alt="CI"></a>
@@ -30,7 +30,7 @@
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.sonarkt") version "0.1.0"
+    id("io.github.mikhailhal.sonarkt") version "0.1.0"
 }
 ```
 

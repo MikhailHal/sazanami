@@ -1,4 +1,4 @@
-package io.github.sonarkt
+package io.github.mikhailhal.sonarkt
 
 /**
  * テストコードを模擬

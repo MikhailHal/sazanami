@@ -1,4 +1,4 @@
-package io.github.sonarkt
+package io.github.mikhailhal.sonarkt
 
 /**
  * 中間層の関数
