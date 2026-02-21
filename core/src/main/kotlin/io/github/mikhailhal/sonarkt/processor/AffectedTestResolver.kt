@@ -1,6 +1,8 @@
 package io.github.mikhailhal.sonarkt.processor
 
+import io.github.mikhailhal.sonarkt.collector.ChangedFunction
 import io.github.mikhailhal.sonarkt.common.FunctionFqn
+import io.github.mikhailhal.sonarkt.common.FunctionNode
 
 /**
  * 変更された関数から影響を受けるテストを特定する
@@ -49,13 +51,17 @@ class AffectedTestResolver(
     /**
      * 変更された関数から影響を受けるテストを特定
      *
-     * @param changedFunctions 変更された関数のFQN集合
+     * @param changedFunctions 変更された関数の集合
      * @return 影響を受けるテスト関数のFQN集合
      */
-    fun findAffectedTests(changedFunctions: Set<FunctionFqn>): Set<FunctionFqn> {
+    fun findAffectedTests(changedFunctions: Set<ChangedFunction>): Set<FunctionFqn> {
         val affectedTests = mutableSetOf<FunctionFqn>()
-        val seen = mutableSetOf<FunctionFqn>()
-        val queue = ArrayDeque(changedFunctions)
+        val seen = mutableSetOf<FunctionNode>()
+
+        // ChangedFunctionをFunctionNodeに変換してキューに入れる
+        val queue = ArrayDeque(changedFunctions.map {
+            FunctionNode.forLookup(it.fqn, it.moduleName)
+        })
 
         while (queue.isNotEmpty()) {
             val callee = queue.removeFirst()
@@ -85,7 +91,7 @@ class AffectedTestResolver(
                  * testA が変更された場合、testB も影響を受ける。
                  * よって、テスト関数でも探索を止めずに継続する。
                  */
-                queue.add(caller.fqn)
+                queue.add(caller)
             }
         }
         return affectedTests

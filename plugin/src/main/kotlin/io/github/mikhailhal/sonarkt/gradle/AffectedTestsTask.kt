@@ -1,6 +1,7 @@
 package io.github.mikhailhal.sonarkt.gradle
 
 import io.github.mikhailhal.sonarkt.SonarKt
+import io.github.mikhailhal.sonarkt.common.ModuleName
 import org.gradle.api.DefaultTask
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
@@ -12,6 +13,9 @@ import java.nio.file.Path
  * 変更されたコードに影響を受けるテストを検出するタスク
  *
  * Usage: ./gradlew affectedTests
+ *
+ * マルチモジュールプロジェクトにも対応。
+ * 各サブプロジェクトを自動検出してソースルートを収集する。
  */
 abstract class AffectedTestsTask : DefaultTask() {
 
@@ -30,13 +34,15 @@ abstract class AffectedTestsTask : DefaultTask() {
             return
         }
 
-        val sourceRoots = collectSourceRoots()
-        if (sourceRoots.isEmpty()) {
+        val (moduleSourceRoots, modulePathMapping) = collectModuleInfo()
+        if (moduleSourceRoots.isEmpty()) {
             logger.warn("No Kotlin source roots found")
             return
         }
 
-        val output = SonarKt.findAffectedTestsAsString(diff, sourceRoots)
+        logger.lifecycle("Detected modules: ${moduleSourceRoots.keys.joinToString(", ")}")
+
+        val output = SonarKt.findAffectedTestsAsString(diff, moduleSourceRoots, modulePathMapping)
 
         if (output.isNotEmpty()) {
             logger.lifecycle("Affected tests:")
@@ -49,7 +55,7 @@ abstract class AffectedTestsTask : DefaultTask() {
     private fun getGitDiff(baseBranch: String): String {
         return try {
             val process = ProcessBuilder("git", "diff", "--unified=0", "$baseBranch...HEAD")
-                .directory(project.projectDir)
+                .directory(project.rootProject.projectDir)
                 .redirectErrorStream(true)
                 .start()
 
@@ -68,7 +74,37 @@ abstract class AffectedTestsTask : DefaultTask() {
         }
     }
 
-    private fun collectSourceRoots(): List<Path> {
+    /**
+     * マルチモジュール情報を収集
+     *
+     * @return Pair of (moduleSourceRoots, modulePathMapping)
+     */
+    private fun collectModuleInfo(): Pair<Map<ModuleName, List<Path>>, Map<ModuleName, String>> {
+        val moduleSourceRoots = mutableMapOf<ModuleName, List<Path>>()
+        val modulePathMapping = mutableMapOf<ModuleName, String>()
+        val rootDir = project.rootProject.projectDir
+
+        // ルートプロジェクトと全サブプロジェクトを処理
+        val allProjects = listOf(project.rootProject) + project.rootProject.subprojects
+
+        for (proj in allProjects) {
+            val moduleName: ModuleName = proj.path.ifEmpty { ":" }
+            val relativePath = rootDir.toPath().relativize(proj.projectDir.toPath()).toString()
+
+            val sourceRoots = collectSourceRootsForProject(proj.projectDir)
+            if (sourceRoots.isNotEmpty()) {
+                moduleSourceRoots[moduleName] = sourceRoots
+                modulePathMapping[moduleName] = relativePath.ifEmpty { "." }
+            }
+        }
+
+        return Pair(moduleSourceRoots, modulePathMapping)
+    }
+
+    /**
+     * 単一プロジェクトのソースルートを収集
+     */
+    private fun collectSourceRootsForProject(projectDir: java.io.File): List<Path> {
         val roots = mutableListOf<Path>()
 
         val standardPaths = listOf(
@@ -78,7 +114,7 @@ abstract class AffectedTestsTask : DefaultTask() {
             "src/test/java"
         )
         standardPaths.forEach { path ->
-            val dir = project.projectDir.resolve(path)
+            val dir = projectDir.resolve(path)
             if (dir.exists()) {
                 roots.add(dir.toPath())
             }

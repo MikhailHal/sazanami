@@ -1,6 +1,7 @@
 package io.github.mikhailhal.sonarkt.processor
 
 import io.github.mikhailhal.sonarkt.common.FunctionNode
+import io.github.mikhailhal.sonarkt.common.ModuleName
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
@@ -23,11 +24,16 @@ class GraphBuilder {
     private val graph = ReverseDependencyGraph()
 
     /**
-     * 複数のKtFileを処理してグラフを構築
+     * 複数モジュールのKtFileを処理してグラフを構築
+     *
+     * @param moduleFiles モジュール名 → KtFileリストのマッピング
+     * @return 構築された逆方向依存グラフ
      */
-    fun build(files: List<KtFile>): ReverseDependencyGraph {
-        for (file in files) {
-            processFile(file)
+    fun build(moduleFiles: Map<ModuleName, List<KtFile>>): ReverseDependencyGraph {
+        for ((moduleName, files) in moduleFiles) {
+            for (file in files) {
+                processFile(file, moduleName)
+            }
         }
         return graph
     }
@@ -35,10 +41,10 @@ class GraphBuilder {
     /**
      * 単一のKtFileを処理
      */
-    private fun processFile(file: KtFile) {
+    private fun processFile(file: KtFile, moduleName: ModuleName) {
         file.accept(object : KtTreeVisitorVoid() {
             override fun visitCallExpression(expression: KtCallExpression) {
-                processCallExpression(expression)
+                processCallExpression(expression, moduleName)
                 super.visitCallExpression(expression)
             }
         })
@@ -47,17 +53,14 @@ class GraphBuilder {
     /**
      * 関数呼び出しを処理してグラフにエッジを追加
      */
-    private fun processCallExpression(expression: KtCallExpression) {
+    private fun processCallExpression(expression: KtCallExpression, moduleName: ModuleName) {
         // 1. caller を特定: この呼び出しを含む関数
-        val callerFunction = expression.getParentOfType<KtNamedFunction>(strict = true)
-        if (callerFunction == null) {
-            // トップレベルの呼び出し（関数外）はスキップ
-            return
-        }
+        val callerFunction = expression.getParentOfType<KtNamedFunction>(strict = true) ?: // トップレベルの呼び出し（関数外）はスキップ
+        return
 
         val callerFqn = callerFunction.fqName?.asString() ?: return
         val callerIsTest = hasTestAnnotation(callerFunction)
-        val callerNode = FunctionNode(callerFqn, callerIsTest)
+        val callerNode = FunctionNode(callerFqn, moduleName, callerIsTest)
 
         // 2. callee を解決: Analysis API で関数シンボルを取得
         analyze(expression) {
@@ -67,8 +70,9 @@ class GraphBuilder {
             if (functionSymbol != null) {
                 val calleeFqn = functionSymbol.callableId?.asSingleFqName()?.asString()
                 if (calleeFqn != null) {
-                    // calleeのisTestはここでは不明だが、検索キーとしてしか使わないのでfalseで良い
-                    val calleeNode = FunctionNode.forLookup(calleeFqn)
+                    // calleeのisTestとmoduleNameはここでは不明だが、検索キーとしてしか使わない
+                    // 同一モジュール内の呼び出しと仮定
+                    val calleeNode = FunctionNode.forLookup(calleeFqn, moduleName)
                     graph.addEdge(callerNode, calleeNode)
                 }
             }

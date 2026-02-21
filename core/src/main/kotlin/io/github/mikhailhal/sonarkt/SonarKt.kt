@@ -2,6 +2,7 @@ package io.github.mikhailhal.sonarkt
 
 import com.intellij.openapi.util.Disposer
 import io.github.mikhailhal.sonarkt.collector.ChangedFunctionCollector
+import io.github.mikhailhal.sonarkt.common.ModuleName
 import io.github.mikhailhal.sonarkt.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sonarkt.processor.AffectedTestResolver
 import io.github.mikhailhal.sonarkt.processor.GraphBuilder
@@ -14,38 +15,50 @@ import java.nio.file.Path
 /**
  * sonar-kt のメインAPI
  *
- * 使い方:
+ * マルチモジュールプロジェクト対応版:
  * ```
  * val affected = SonarKt.findAffectedTests(
  *     diff = "git diff output...",
- *     sourceRoots = listOf(Path.of("src/main/kotlin"), Path.of("src/test/kotlin"))
+ *     moduleSourceRoots = mapOf(
+ *         ":core" to listOf(Path.of("core/src/main/kotlin"), Path.of("core/src/test/kotlin")),
+ *         ":plugin" to listOf(Path.of("plugin/src/main/kotlin"), Path.of("plugin/src/test/kotlin"))
+ *     ),
+ *     modulePathMapping = mapOf(":core" to "core", ":plugin" to "plugin")
  * )
  * ```
  */
 object SonarKt {
 
     /**
-     * 変更されたコードに影響を受けるテストのFQN一覧を返す
+     * 変更されたコードに影響を受けるテストのFQN一覧を返す（マルチモジュール対応）
      *
      * @param diff git diff --unified=0 の出力
-     * @param sourceRoots Kotlinソースのルートディレクトリ
+     * @param moduleSourceRoots モジュール名 → ソースルートリストのマッピング
+     * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング（diff解析用）
      * @return 影響テストのFQN集合
      */
-    fun findAffectedTests(diff: String, sourceRoots: List<Path>): Set<String> {
-        if (diff.isEmpty() || sourceRoots.isEmpty()) {
+    fun findAffectedTests(
+        diff: String,
+        moduleSourceRoots: Map<ModuleName, List<Path>>,
+        modulePathMapping: Map<ModuleName, String>
+    ): Set<String> {
+        if (diff.isEmpty() || moduleSourceRoots.isEmpty()) {
             return emptySet()
         }
 
         val projectDisposable = Disposer.newDisposable("sonar-kt")
 
         try {
-            val ktFiles = extractKtFilesViaSession(sourceRoots, projectDisposable)
-            if (ktFiles.isEmpty()) {
+            val moduleFiles = extractKtFilesViaSession(moduleSourceRoots, projectDisposable)
+            if (moduleFiles.values.all { it.isEmpty() }) {
                 return emptySet()
             }
 
-            val changedFunctions = ChangedFunctionCollector().collect(diff, ktFiles)
-            val graph = GraphBuilder().build(ktFiles)
+            // ChangedFunctionCollectorは全ファイルをフラットに受け取る
+            val allKtFiles = moduleFiles.values.flatten()
+            val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping)
+
+            val graph = GraphBuilder().build(moduleFiles)
             return AffectedTestResolver(graph).findAffectedTests(changedFunctions)
         } finally {
             Disposer.dispose(projectDisposable)
@@ -53,29 +66,43 @@ object SonarKt {
     }
 
     /**
-     * 影響テストを改行区切りの文字列で返す
+     * 影響テストを改行区切りの文字列で返す（マルチモジュール対応）
      */
-    fun findAffectedTestsAsString(diff: String, sourceRoots: List<Path>): String {
-        val affected = findAffectedTests(diff, sourceRoots)
+    fun findAffectedTestsAsString(
+        diff: String,
+        moduleSourceRoots: Map<ModuleName, List<Path>>,
+        modulePathMapping: Map<ModuleName, String>
+    ): String {
+        val affected = findAffectedTests(diff, moduleSourceRoots, modulePathMapping)
         return AffectedTestEmitter.emit(affected)
     }
 
-    private fun extractKtFilesViaSession(sourceRoots: List<Path>, disposable: com.intellij.openapi.Disposable): List<KtFile> {
+    /**
+     * 各モジュールからKtFileを抽出
+     *
+     * @return モジュール名 → KtFileリストのマッピング
+     */
+    private fun extractKtFilesViaSession(
+        moduleSourceRoots: Map<ModuleName, List<Path>>,
+        disposable: com.intellij.openapi.Disposable
+    ): Map<ModuleName, List<KtFile>> {
         val session = buildStandaloneAnalysisAPISession(disposable) {
             buildKtModuleProvider {
                 platform = JvmPlatforms.defaultJvmPlatform
 
-                addModule(buildKtSourceModule {
-                    moduleName = "project"
-                    platform = JvmPlatforms.defaultJvmPlatform
-                    sourceRoots.forEach { addSourceRoot(it) }
-                })
+                for ((moduleName, sourceRoots) in moduleSourceRoots) {
+                    addModule(buildKtSourceModule {
+                        this.moduleName = moduleName
+                        platform = JvmPlatforms.defaultJvmPlatform
+                        sourceRoots.forEach { addSourceRoot(it) }
+                    })
+                }
             }
         }
 
-        // モジュールに紐づいたファイル一覧からKtFileのみ抽出して返却
+        // KaSourceModule.name でモジュール名を取得し、KtFileをグループ化
         return session.modulesWithFiles
-            .flatMap { it.value }
-            .filterIsInstance<KtFile>()
+            .mapKeys { (kaModule, _) -> kaModule.name }
+            .mapValues { (_, files) -> files.filterIsInstance<KtFile>() }
     }
 }

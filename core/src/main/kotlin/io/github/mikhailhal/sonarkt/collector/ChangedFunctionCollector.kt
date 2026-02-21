@@ -2,7 +2,7 @@ package io.github.mikhailhal.sonarkt.collector
 
 import com.intellij.openapi.editor.Document
 import com.intellij.psi.PsiDocumentManager
-import io.github.mikhailhal.sonarkt.common.FunctionFqn
+import io.github.mikhailhal.sonarkt.common.ModuleName
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
@@ -20,15 +20,21 @@ import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
 class ChangedFunctionCollector {
 
     /**
-     * 変更された関数のFQNを収集
+     * 変更された関数を収集
      *
      * @param diffOutput git diff --unified=0 の出力
      * @param ktFiles 解析対象のKtFileリスト
-     * @return 変更された関数のFQN集合
+     * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング
+     *                         例: mapOf(":core" to "core", ":plugin" to "plugin")
+     * @return 変更された関数の集合
      */
-    fun collect(diffOutput: String, ktFiles: List<KtFile>): Set<FunctionFqn> {
+    fun collect(
+        diffOutput: String,
+        ktFiles: List<KtFile>,
+        modulePathMapping: Map<ModuleName, String>
+    ): Set<ChangedFunction> {
         val fileDiffs = GitDiffParser.parseKotlinFiles(diffOutput)
-        val changedFunctions = mutableSetOf<FunctionFqn>()
+        val changedFunctions = mutableSetOf<ChangedFunction>()
 
         if (fileDiffs.isEmpty()) return emptySet()
 
@@ -39,8 +45,11 @@ class ChangedFunctionCollector {
 
             val fileDiff = fileDiffs[relativePath] ?: continue
 
+            // ファイルパスからモジュール名を解決
+            val moduleName = resolveModuleName(relativePath, modulePathMapping)
+
             // このファイルの変更された関数を収集
-            val functions = collectChangedFunctionsInFile(ktFile, fileDiff)
+            val functions = collectChangedFunctionsInFile(ktFile, fileDiff, moduleName)
             changedFunctions.addAll(functions)
         }
 
@@ -48,13 +57,41 @@ class ChangedFunctionCollector {
     }
 
     /**
+     * ファイルパスからモジュール名を解決
+     *
+     * 最長プレフィックスマッチングでモジュールを特定する。
+     * 例: "core/src/main/kotlin/Foo.kt" → ":core"
+     *
+     * @param filePath リポジトリルートからの相対パス
+     * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング
+     * @return 該当するモジュール名、見つからない場合は空文字列
+     */
+    private fun resolveModuleName(
+        filePath: String,
+        modulePathMapping: Map<ModuleName, String>
+    ): ModuleName {
+        var bestMatch: ModuleName = ""
+        var bestMatchLength = 0
+
+        for ((moduleName, modulePath) in modulePathMapping) {
+            if (filePath.startsWith(modulePath) && modulePath.length > bestMatchLength) {
+                bestMatch = moduleName
+                bestMatchLength = modulePath.length
+            }
+        }
+
+        return bestMatch
+    }
+
+    /**
      * 単一ファイル内の変更された関数を収集
      */
     private fun collectChangedFunctionsInFile(
         ktFile: KtFile,
-        fileDiff: FileDiff
-    ): Set<FunctionFqn> {
-        val changedFunctions = mutableSetOf<FunctionFqn>()
+        fileDiff: FileDiff,
+        moduleName: ModuleName
+    ): Set<ChangedFunction> {
+        val changedFunctions = mutableSetOf<ChangedFunction>()
         val document = getDocument(ktFile) ?: return emptySet()
 
         ktFile.accept(object : KtTreeVisitorVoid() {
@@ -63,7 +100,7 @@ class ChangedFunctionCollector {
                     getFunctionLineRange(function, document)?.let { functionRange ->
                         val isChangedFunction = fileDiff.overlapsWithRange(functionRange)
                         if (isChangedFunction) {
-                            changedFunctions.add(fqn)
+                            changedFunctions.add(ChangedFunction(fqn, moduleName))
                         }
                     }
                 }
