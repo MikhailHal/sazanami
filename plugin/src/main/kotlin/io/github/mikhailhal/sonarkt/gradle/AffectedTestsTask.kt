@@ -2,6 +2,9 @@ package io.github.mikhailhal.sonarkt.gradle
 
 import io.github.mikhailhal.sonarkt.SonarKt
 import org.gradle.api.DefaultTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Path
 
@@ -12,9 +15,16 @@ import java.nio.file.Path
  */
 abstract class AffectedTestsTask : DefaultTask() {
 
+    @get:Input
+    @get:Optional
+    abstract val baseBranch: Property<String>
+
     @TaskAction
     fun run() {
-        val diff = getGitDiff()
+        val base = BaseBranchResolver.resolve(baseBranch.orNull)
+        logger.lifecycle("Comparing against: $base")
+
+        val diff = getGitDiff(base)
         if (diff.isEmpty()) {
             logger.lifecycle("No changes detected")
             return
@@ -36,9 +46,9 @@ abstract class AffectedTestsTask : DefaultTask() {
         }
     }
 
-    private fun getGitDiff(): String {
+    private fun getGitDiff(baseBranch: String): String {
         return try {
-            val process = ProcessBuilder("git", "diff", "--unified=0", "HEAD")
+            val process = ProcessBuilder("git", "diff", "--unified=0", "$baseBranch...HEAD")
                 .directory(project.projectDir)
                 .redirectErrorStream(true)
                 .start()
@@ -49,7 +59,7 @@ abstract class AffectedTestsTask : DefaultTask() {
             if (exitCode == 0) {
                 output
             } else {
-                logger.warn("git diff failed with exit code $exitCode")
+                logger.warn("git diff failed with exit code $exitCode: $output")
                 ""
             }
         } catch (e: Exception) {
@@ -61,7 +71,6 @@ abstract class AffectedTestsTask : DefaultTask() {
     private fun collectSourceRoots(): List<Path> {
         val roots = mutableListOf<Path>()
 
-        // フォールバック: 標準的なパスを探す
         val standardPaths = listOf(
             "src/main/kotlin",
             "src/test/kotlin",

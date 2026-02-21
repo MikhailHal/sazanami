@@ -11,6 +11,10 @@ import org.gradle.api.Project
  * plugins {
  *     id("io.github.mikhailhal.sonarkt")
  * }
+ *
+ * sonarKt {
+ *     baseBranch.set("origin/develop")  // optional
+ * }
  * ```
  *
  * Tasks:
@@ -18,9 +22,12 @@ import org.gradle.api.Project
  */
 class SonarKtPlugin : Plugin<Project> {
     override fun apply(project: Project) {
-        project.tasks.register("affectedTests", AffectedTestsTask::class.java) {
-            it.group = "verification"
-            it.description = "Detect tests affected by code changes"
+        val extension = project.extensions.create("sonarKt", SonarKtExtension::class.java)
+
+        project.tasks.register("affectedTests", AffectedTestsTask::class.java) { task ->
+            task.group = "verification"
+            task.description = "Detect tests affected by code changes"
+            task.baseBranch.set(extension.baseBranch)
         }
     }
 }
