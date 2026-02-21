@@ -2,6 +2,7 @@ package io.github.mikhailhal.sonarkt
 
 import com.intellij.openapi.util.Disposer
 import io.github.mikhailhal.sonarkt.collector.ChangedFunctionCollector
+import io.github.mikhailhal.sonarkt.common.ModuleName
 import io.github.mikhailhal.sonarkt.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sonarkt.processor.AffectedTestResolver
 import io.github.mikhailhal.sonarkt.processor.GraphBuilder
@@ -11,6 +12,9 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 import java.nio.file.Paths
 import kotlin.system.exitProcess
+
+// シングルモジュール用のデフォルトモジュール名
+private const val DEFAULT_MODULE: ModuleName = "main"
 
 /**
  * sonar-kt CLI エントリーポイント
@@ -33,8 +37,9 @@ fun main(args: Array<String>) {
     val projectDisposable = Disposer.newDisposable("sonar-kt")
 
     try {
-        val ktFiles = loadKtFiles(projectPath, projectDisposable)
-        val output = runPipeline(diff, ktFiles)
+        val moduleFiles = loadKtFiles(projectPath, projectDisposable)
+        val modulePathMapping = mapOf(DEFAULT_MODULE to projectPath)
+        val output = runPipeline(diff, moduleFiles, modulePathMapping)
 
         if (output.isNotEmpty()) {
             println(output)
@@ -68,13 +73,16 @@ private fun readDiffFromStdin(): String {
 /**
  * プロジェクトからKtFileを読み込む
  */
-private fun loadKtFiles(projectPath: String, disposable: com.intellij.openapi.Disposable): List<KtFile> {
+private fun loadKtFiles(
+    projectPath: String,
+    disposable: com.intellij.openapi.Disposable
+): Map<ModuleName, List<KtFile>> {
     val session = buildStandaloneAnalysisAPISession(disposable) {
         buildKtModuleProvider {
             platform = JvmPlatforms.defaultJvmPlatform
 
             addModule(buildKtSourceModule {
-                moduleName = "main"
+                moduleName = DEFAULT_MODULE
                 platform = JvmPlatforms.defaultJvmPlatform
                 addSourceRoot(Paths.get(projectPath))
             })
@@ -82,16 +90,21 @@ private fun loadKtFiles(projectPath: String, disposable: com.intellij.openapi.Di
     }
 
     return session.modulesWithFiles
-        .flatMap { it.value }
-        .filterIsInstance<KtFile>()
+        .mapKeys { (kaModule, _) -> kaModule.name }
+        .mapValues { (_, files) -> files.filterIsInstance<KtFile>() }
 }
 
 /**
  * パイプライン実行
  */
-private fun runPipeline(diff: String, ktFiles: List<KtFile>): String {
-    val changedFunctions = ChangedFunctionCollector().collect(diff, ktFiles)
-    val graph = GraphBuilder().build(ktFiles)
+private fun runPipeline(
+    diff: String,
+    moduleFiles: Map<ModuleName, List<KtFile>>,
+    modulePathMapping: Map<ModuleName, String>
+): String {
+    val allKtFiles = moduleFiles.values.flatten()
+    val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping)
+    val graph = GraphBuilder().build(moduleFiles)
     val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
     return AffectedTestEmitter.emit(affectedTests)
 }

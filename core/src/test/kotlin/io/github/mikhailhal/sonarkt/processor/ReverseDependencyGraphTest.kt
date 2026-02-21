@@ -7,9 +7,12 @@ import kotlin.test.assertTrue
 
 class ReverseDependencyGraphTest {
 
+    // テスト用のデフォルトモジュール名
+    private val testModule = ":test"
+
     // Helper to create test nodes
-    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, isTest)
-    private fun testNode(fqn: String) = FunctionNode(fqn, isTest = true)
+    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, testModule, isTest)
+    private fun testNode(fqn: String) = FunctionNode(fqn, testModule, isTest = true)
 
     // === addEdge / getCallers ===
 
@@ -19,7 +22,7 @@ class ReverseDependencyGraphTest {
 
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
 
-        val callers = graph.getCallers("Calculator.add")
+        val callers = graph.getCallers(node("Calculator.add"))
         assertEquals(1, callers.size)
         assertTrue(callers.any { it.fqn == "testAdd" })
     }
@@ -31,7 +34,7 @@ class ReverseDependencyGraphTest {
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
         graph.addEdge(node("helperB"), node("Calculator.add"))
 
-        val callers = graph.getCallers("Calculator.add")
+        val callers = graph.getCallers(node("Calculator.add"))
         assertEquals(2, callers.size)
         assertTrue(callers.any { it.fqn == "testAdd" })
         assertTrue(callers.any { it.fqn == "helperB" })
@@ -44,17 +47,17 @@ class ReverseDependencyGraphTest {
         graph.addEdge(node("main"), node("foo"))
         graph.addEdge(node("main"), node("bar"))
 
-        assertEquals(1, graph.getCallers("foo").size)
-        assertEquals(1, graph.getCallers("bar").size)
-        assertTrue(graph.getCallers("foo").any { it.fqn == "main" })
-        assertTrue(graph.getCallers("bar").any { it.fqn == "main" })
+        assertEquals(1, graph.getCallers(node("foo")).size)
+        assertEquals(1, graph.getCallers(node("bar")).size)
+        assertTrue(graph.getCallers(node("foo")).any { it.fqn == "main" })
+        assertTrue(graph.getCallers(node("bar")).any { it.fqn == "main" })
     }
 
     @Test
     fun `getCallers returns empty set for unknown callee`() {
         val graph = ReverseDependencyGraph()
 
-        val callers = graph.getCallers("unknown.function")
+        val callers = graph.getCallers(node("unknown.function"))
         assertTrue(callers.isEmpty())
     }
 
@@ -65,7 +68,7 @@ class ReverseDependencyGraphTest {
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
 
-        val callers = graph.getCallers("Calculator.add")
+        val callers = graph.getCallers(node("Calculator.add"))
         assertEquals(1, callers.size)
     }
 
@@ -125,12 +128,36 @@ class ReverseDependencyGraphTest {
         graph.addEdge(testNode("CalculatorTest.testAdd"), node("Calculator.add"))
         graph.addEdge(node("Helper.helperB"), node("Calculator.add"))
 
-        val callers = graph.getCallers("Calculator.add")
+        val callers = graph.getCallers(node("Calculator.add"))
 
         val testCaller = callers.find { it.fqn == "CalculatorTest.testAdd" }
         val helperCaller = callers.find { it.fqn == "Helper.helperB" }
 
         assertEquals(true, testCaller?.isTest)
         assertEquals(false, helperCaller?.isTest)
+    }
+
+    // === Multi-module support ===
+
+    @Test
+    fun `same fqn in different modules are distinct`() {
+        val graph = ReverseDependencyGraph()
+
+        val coreModule = ":core"
+        val pluginModule = ":plugin"
+
+        val coreCallee = FunctionNode("com.example.Util.foo", coreModule, isTest = false)
+        val pluginCallee = FunctionNode("com.example.Util.foo", pluginModule, isTest = false)
+
+        graph.addEdge(testNode("testCore"), coreCallee)
+        graph.addEdge(testNode("testPlugin"), pluginCallee)
+
+        val coreCallers = graph.getCallers(coreCallee)
+        val pluginCallers = graph.getCallers(pluginCallee)
+
+        assertEquals(1, coreCallers.size)
+        assertEquals(1, pluginCallers.size)
+        assertTrue(coreCallers.any { it.fqn == "testCore" })
+        assertTrue(pluginCallers.any { it.fqn == "testPlugin" })
     }
 }

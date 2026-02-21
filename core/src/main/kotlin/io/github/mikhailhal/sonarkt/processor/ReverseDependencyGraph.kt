@@ -1,6 +1,5 @@
 package io.github.mikhailhal.sonarkt.processor
 
-import io.github.mikhailhal.sonarkt.common.FunctionFqn
 import io.github.mikhailhal.sonarkt.common.FunctionNode
 
 /**
@@ -14,8 +13,8 @@ import io.github.mikhailhal.sonarkt.common.FunctionNode
  *   Calculator.add が testAdd と helperB から呼ばれている場合:
  *   edges[Calculator.add] = {testAdd, helperB}
  *
- * FunctionNodeのequals/hashCodeはfqnのみで判定されるため、
- * 検索時はFunctionNode.forLookup(fqn)で検索用ノードを作成できる。
+ * FunctionNodeのequals/hashCodeはfqn + moduleNameで判定されるため、
+ * マルチモジュール環境でも同じFQNを持つ異なるモジュールの関数を区別できる。
  */
 class ReverseDependencyGraph {
     private val edges: MutableMap<FunctionNode, MutableSet<FunctionNode>> = mutableMapOf()
@@ -26,15 +25,6 @@ class ReverseDependencyGraph {
      */
     fun addEdge(caller: FunctionNode, callee: FunctionNode) {
         edges.getOrPut(callee) { mutableSetOf() }.add(caller)
-    }
-
-    /**
-     * callee を呼んでいる関数（caller）の一覧を取得
-     * FQN文字列で検索可能（FunctionNode.forLookupを内部で使用）
-     */
-    fun getCallers(callee: FunctionFqn): Set<FunctionNode> {
-        val lookupKey = FunctionNode.forLookup(callee)
-        return edges[lookupKey] ?: emptySet()
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.github.mikhailhal.sonarkt.processor
 
+import io.github.mikhailhal.sonarkt.collector.ChangedFunction
 import io.github.mikhailhal.sonarkt.common.FunctionNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,9 +8,13 @@ import kotlin.test.assertTrue
 
 class AffectedTestResolverTest {
 
+    // テスト用のデフォルトモジュール名
+    private val testModule = ":test"
+
     // Helper to create nodes
-    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, isTest)
-    private fun testNode(fqn: String) = FunctionNode(fqn, isTest = true)
+    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, testModule, isTest)
+    private fun testNode(fqn: String) = FunctionNode(fqn, testModule, isTest = true)
+    private fun changed(fqn: String) = ChangedFunction(fqn, testModule)
 
     // === Basic detection ===
 
@@ -19,7 +24,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
     }
@@ -32,7 +37,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.CalculatorTest.testHelper"), node("com.example.helperB"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(setOf("com.example.CalculatorTest.testHelper"), affected)
     }
@@ -44,7 +49,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.CalculatorTest.testAddNegative"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(
             setOf(
@@ -63,7 +68,7 @@ class AffectedTestResolverTest {
 
         val resolver = AffectedTestResolver(graph)
         val affected = resolver.findAffectedTests(
-            setOf("com.example.Calculator.add", "com.example.Calculator.multiply")
+            setOf(changed("com.example.Calculator.add"), changed("com.example.Calculator.multiply"))
         )
 
         assertEquals(
@@ -84,7 +89,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.SomeTest.testA"), testNode("com.example.SomeTest.testB"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.changed"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.changed")))
 
         assertEquals(
             setOf(
@@ -113,7 +118,7 @@ class AffectedTestResolverTest {
         val graph = ReverseDependencyGraph()
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.unused"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.unused")))
 
         assertTrue(affected.isEmpty())
     }
@@ -128,7 +133,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.SomeTest.testA"), node("a"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("a"))
+        val affected = resolver.findAffectedTests(setOf(changed("a")))
 
         // Should complete without hanging
         assertEquals(setOf("com.example.SomeTest.testA"), affected)
@@ -142,7 +147,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.Helper.testSomething"), node("com.example.foo"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.foo")))
 
         assertEquals(setOf("com.example.Helper.testSomething"), affected)
     }
@@ -153,7 +158,7 @@ class AffectedTestResolverTest {
         graph.addEdge(node("com.example.Helper.doSomething"), node("com.example.foo"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.foo")))
 
         assertTrue(affected.isEmpty())
     }
@@ -165,7 +170,7 @@ class AffectedTestResolverTest {
         graph.addEdge(node("com.example.Helper.helper"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         // Only the test function should be in result
         assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
@@ -179,7 +184,7 @@ class AffectedTestResolverTest {
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Helper.helper"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
     }

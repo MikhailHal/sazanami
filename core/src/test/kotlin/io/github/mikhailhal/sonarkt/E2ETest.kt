@@ -2,6 +2,7 @@ package io.github.mikhailhal.sonarkt
 
 import com.intellij.openapi.util.Disposer
 import io.github.mikhailhal.sonarkt.collector.ChangedFunctionCollector
+import io.github.mikhailhal.sonarkt.common.ModuleName
 import io.github.mikhailhal.sonarkt.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sonarkt.processor.AffectedTestResolver
 import io.github.mikhailhal.sonarkt.processor.GraphBuilder
@@ -25,6 +26,10 @@ import kotlin.test.assertTrue
  *            → AffectedTestResolver → AffectedTestEmitter → output
  */
 class E2ETest {
+
+    // テスト用のモジュール名とマッピング
+    private val testModule: ModuleName = "test"
+    private val modulePathMapping = mapOf(testModule to "src/test/resources/sandbox")
 
     @Test
     fun `changing Calculator_add detects testAdd and testHelper`() {
@@ -164,12 +169,13 @@ class E2ETest {
     /**
      * 全パイプラインを実行
      */
-    private fun runPipeline(diff: String, ktFiles: List<KtFile>): String {
+    private fun runPipeline(diff: String, moduleFiles: Map<ModuleName, List<KtFile>>): String {
         // 1. 変更された関数を収集
-        val changedFunctions = ChangedFunctionCollector().collect(diff, ktFiles)
+        val allKtFiles = moduleFiles.values.flatten()
+        val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping)
 
         // 2. 依存グラフを構築
-        val graph = GraphBuilder().build(ktFiles)
+        val graph = GraphBuilder().build(moduleFiles)
 
         // 3. 影響テストを解決
         val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
@@ -181,7 +187,7 @@ class E2ETest {
     /**
      * sandboxファイルでAnalysis APIセッションを構築して処理を実行
      */
-    private fun withSandboxFiles(block: (List<KtFile>) -> Unit) {
+    private fun withSandboxFiles(block: (Map<ModuleName, List<KtFile>>) -> Unit) {
         val projectDisposable = Disposer.newDisposable("E2ETest")
 
         try {
@@ -190,18 +196,18 @@ class E2ETest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
                     })
                 }
             }
 
-            val ktFiles = session.modulesWithFiles
-                .flatMap { it.value }
-                .filterIsInstance<KtFile>()
+            val moduleFiles = session.modulesWithFiles
+                .mapKeys { (kaModule, _) -> kaModule.name }
+                .mapValues { (_, files) -> files.filterIsInstance<KtFile>() }
 
-            block(ktFiles)
+            block(moduleFiles)
         } finally {
             Disposer.dispose(projectDisposable)
         }
