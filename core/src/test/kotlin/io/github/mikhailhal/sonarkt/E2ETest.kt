@@ -30,6 +30,7 @@ class E2ETest {
     // テスト用のモジュール名とマッピング
     private val testModule: ModuleName = "test"
     private val modulePathMapping = mapOf(testModule to "src/test/resources/sandbox")
+    private val projectRoot = Paths.get("").toAbsolutePath()
 
     @Test
     fun `changing Calculator_add detects testAdd and testHelper`() {
@@ -172,7 +173,7 @@ class E2ETest {
     private fun runPipeline(diff: String, moduleFiles: Map<ModuleName, List<KtFile>>): String {
         // 1. 変更された関数を収集
         val allKtFiles = moduleFiles.values.flatten()
-        val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping)
+        val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping, projectRoot)
 
         // 2. 依存グラフを構築
         val graph = GraphBuilder().build(moduleFiles)

@@ -35,12 +35,14 @@ object SonarKt {
      * @param diff git diff --unified=0 の出力
      * @param moduleSourceRoots モジュール名 → ソースルートリストのマッピング
      * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング（diff解析用）
+     * @param projectRoot プロジェクトルートの絶対パス
      * @return 影響テストのFQN集合
      */
     fun findAffectedTests(
         diff: String,
         moduleSourceRoots: Map<ModuleName, List<Path>>,
-        modulePathMapping: Map<ModuleName, String>
+        modulePathMapping: Map<ModuleName, String>,
+        projectRoot: Path
     ): Set<String> {
         if (diff.isEmpty() || moduleSourceRoots.isEmpty()) {
             return emptySet()
@@ -56,7 +58,7 @@ object SonarKt {
 
             // ChangedFunctionCollectorは全ファイルをフラットに受け取る
             val allKtFiles = moduleFiles.values.flatten()
-            val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping)
+            val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping, projectRoot)
 
             val graph = GraphBuilder().build(moduleFiles)
             return AffectedTestResolver(graph).findAffectedTests(changedFunctions)
@@ -71,9 +73,10 @@ object SonarKt {
     fun findAffectedTestsAsString(
         diff: String,
         moduleSourceRoots: Map<ModuleName, List<Path>>,
-        modulePathMapping: Map<ModuleName, String>
+        modulePathMapping: Map<ModuleName, String>,
+        projectRoot: Path
     ): String {
-        val affected = findAffectedTests(diff, moduleSourceRoots, modulePathMapping)
+        val affected = findAffectedTests(diff, moduleSourceRoots, modulePathMapping, projectRoot)
         return AffectedTestEmitter.emit(affected)
     }
 

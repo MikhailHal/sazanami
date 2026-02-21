@@ -21,6 +21,7 @@ class ChangedFunctionCollectorTest {
     // テスト用のモジュール名とマッピング
     private val testModule = "test"
     private val modulePathMapping = mapOf(testModule to "src/test/resources/sandbox")
+    private val projectRoot = Paths.get("").toAbsolutePath()
 
     // === collect ===
 
@@ -56,7 +57,7 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
             assertEquals(
                 setOf(ChangedFunction("io.github.mikhailhal.sonarkt.Calculator.add", testModule)),
@@ -101,7 +102,7 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
             assertEquals(
                 setOf(
@@ -147,7 +148,7 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
             assertEquals(setOf(ChangedFunction("io.github.mikhailhal.sonarkt.helperB", testModule)), changed)
         } finally {
@@ -179,7 +180,7 @@ class ChangedFunctionCollectorTest {
                 .filterIsInstance<KtFile>()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect("", ktFiles, modulePathMapping)
+            val changed = collector.collect("", ktFiles, modulePathMapping, projectRoot)
 
             assertTrue(changed.isEmpty())
         } finally {
@@ -199,7 +200,7 @@ class ChangedFunctionCollectorTest {
         """.trimIndent()
 
         val collector = ChangedFunctionCollector()
-        val changed = collector.collect(diffOutput, emptyList(), modulePathMapping)
+        val changed = collector.collect(diffOutput, emptyList(), modulePathMapping, projectRoot)
 
         assertTrue(changed.isEmpty())
     }
@@ -236,7 +237,7 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
             assertTrue(changed.isEmpty())
         } finally {
