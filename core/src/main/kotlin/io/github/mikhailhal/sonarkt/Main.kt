@@ -37,9 +37,10 @@ fun main(args: Array<String>) {
     val projectDisposable = Disposer.newDisposable("sonar-kt")
 
     try {
+        val projectRoot = Paths.get(projectPath).toAbsolutePath()
         val moduleFiles = loadKtFiles(projectPath, projectDisposable)
         val modulePathMapping = mapOf(DEFAULT_MODULE to projectPath)
-        val output = runPipeline(diff, moduleFiles, modulePathMapping)
+        val output = runPipeline(diff, moduleFiles, modulePathMapping, projectRoot)
 
         if (output.isNotEmpty()) {
             println(output)
@@ -100,10 +101,11 @@ private fun loadKtFiles(
 private fun runPipeline(
     diff: String,
     moduleFiles: Map<ModuleName, List<KtFile>>,
-    modulePathMapping: Map<ModuleName, String>
+    modulePathMapping: Map<ModuleName, String>,
+    projectRoot: java.nio.file.Path
 ): String {
     val allKtFiles = moduleFiles.values.flatten()
-    val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping)
+    val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping, projectRoot)
     val graph = GraphBuilder().build(moduleFiles)
     val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
     return AffectedTestEmitter.emit(affectedTests)

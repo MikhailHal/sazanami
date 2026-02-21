@@ -6,6 +6,8 @@ import io.github.mikhailhal.sonarkt.common.ModuleName
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * git diffから変更された関数を特定するCollector
@@ -26,12 +28,14 @@ class ChangedFunctionCollector {
      * @param ktFiles 解析対象のKtFileリスト
      * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング
      *                         例: mapOf(":core" to "core", ":plugin" to "plugin")
+     * @param projectRoot プロジェクトルートの絶対パス（相対パス計算に使用）
      * @return 変更された関数の集合
      */
     fun collect(
         diffOutput: String,
         ktFiles: List<KtFile>,
-        modulePathMapping: Map<ModuleName, String>
+        modulePathMapping: Map<ModuleName, String>,
+        projectRoot: Path
     ): Set<ChangedFunction> {
         val fileDiffs = GitDiffParser.parseKotlinFiles(diffOutput)
         val changedFunctions = mutableSetOf<ChangedFunction>()
@@ -39,9 +43,9 @@ class ChangedFunctionCollector {
         if (fileDiffs.isEmpty()) return emptySet()
 
         for (ktFile in ktFiles) {
-            // ファイルパスをリポジトリルートからの相対パスに変換して照合
+            // ファイルパスをプロジェクトルートからの相対パスに変換して照合
             val filePath = ktFile.virtualFile?.path ?: continue
-            val relativePath = extractRelativePath(filePath)
+            val relativePath = extractRelativePath(filePath, projectRoot)
 
             val fileDiff = fileDiffs[relativePath] ?: continue
 
@@ -135,19 +139,20 @@ class ChangedFunctionCollector {
     }
 
     /**
-     * ファイルパスからリポジトリルートからの相対パスを抽出
+     * ファイルパスからプロジェクトルートからの相対パスを計算
      *
-     * TODO: 現在は簡易実装。実際にはプロジェクトルートを基準に計算すべき
-     * 例: /home/user/project/src/main/Foo.kt → src/main/Foo.kt
+     * @param absolutePath ファイルの絶対パス
+     * @param projectRoot プロジェクトルートの絶対パス
+     * @return プロジェクトルートからの相対パス
      */
-    private fun extractRelativePath(absolutePath: String): String {
-        // 簡易実装: src/ または test/ から始まる部分を抽出
-        val srcIndex = absolutePath.indexOf("/src/")
-        if (srcIndex >= 0) {
-            return absolutePath.substring(srcIndex + 1) // "/src/..." → "src/..."
+    private fun extractRelativePath(absolutePath: String, projectRoot: Path): String {
+        return try {
+            val absPath = Paths.get(absolutePath)
+            projectRoot.relativize(absPath).toString()
+        } catch (e: IllegalArgumentException) {
+            // 異なるルートの場合（Windowsのドライブが違うなど）
+            // フォールバック: ファイル名のみ返す
+            absolutePath.substringAfterLast("/")
         }
-
-        // フォールバック: ファイル名のみ返す（完全一致は期待できない）
-        return absolutePath.substringAfterLast("/")
     }
 }

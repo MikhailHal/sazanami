@@ -42,7 +42,8 @@ abstract class AffectedTestsTask : DefaultTask() {
 
         logger.lifecycle("Detected modules: ${moduleSourceRoots.keys.joinToString(", ")}")
 
-        val output = SonarKt.findAffectedTestsAsString(diff, moduleSourceRoots, modulePathMapping)
+        val projectRoot = project.rootProject.projectDir.toPath()
+        val output = SonarKt.findAffectedTestsAsString(diff, moduleSourceRoots, modulePathMapping, projectRoot)
 
         if (output.isNotEmpty()) {
             logger.lifecycle("Affected tests:")
