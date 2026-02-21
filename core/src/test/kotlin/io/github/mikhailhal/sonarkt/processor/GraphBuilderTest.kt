@@ -44,12 +44,20 @@ class GraphBuilderTest {
 
             // Calculator.add は CalculatorTest.testAdd と helperB から呼ばれる
             val addCallers = graph.getCallers("io.github.mikhailhal.sonarkt.Calculator.add")
-            assertTrue(addCallers.contains("io.github.mikhailhal.sonarkt.CalculatorTest.testAdd"))
-            assertTrue(addCallers.contains("io.github.mikhailhal.sonarkt.helperB"))
+            assertTrue(addCallers.any { it.fqn == "io.github.mikhailhal.sonarkt.CalculatorTest.testAdd" })
+            assertTrue(addCallers.any { it.fqn == "io.github.mikhailhal.sonarkt.helperB" })
 
             // helperB は CalculatorTest.testHelper から呼ばれる
             val helperBCallers = graph.getCallers("io.github.mikhailhal.sonarkt.helperB")
-            assertTrue(helperBCallers.contains("io.github.mikhailhal.sonarkt.CalculatorTest.testHelper"))
+            assertTrue(helperBCallers.any { it.fqn == "io.github.mikhailhal.sonarkt.CalculatorTest.testHelper" })
+
+            // @Test annotation detection: testAdd should have isTest = true
+            val testAddCaller = addCallers.find { it.fqn == "io.github.mikhailhal.sonarkt.CalculatorTest.testAdd" }
+            assertTrue(testAddCaller?.isTest == true, "testAdd should have @Test annotation")
+
+            // helperB should have isTest = false (no @Test annotation)
+            val helperBCaller = addCallers.find { it.fqn == "io.github.mikhailhal.sonarkt.helperB" }
+            assertTrue(helperBCaller?.isTest == false, "helperB should not have @Test annotation")
 
         } finally {
             Disposer.dispose(projectDisposable)

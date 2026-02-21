@@ -1,5 +1,6 @@
 package io.github.mikhailhal.sonarkt.processor
 
+import io.github.mikhailhal.sonarkt.common.FunctionNode
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
@@ -55,6 +56,8 @@ class GraphBuilder {
         }
 
         val callerFqn = callerFunction.fqName?.asString() ?: return
+        val callerIsTest = hasTestAnnotation(callerFunction)
+        val callerNode = FunctionNode(callerFqn, callerIsTest)
 
         // 2. callee を解決: Analysis API で関数シンボルを取得
         analyze(expression) {
@@ -64,9 +67,26 @@ class GraphBuilder {
             if (functionSymbol != null) {
                 val calleeFqn = functionSymbol.callableId?.asSingleFqName()?.asString()
                 if (calleeFqn != null) {
-                    graph.addEdge(callerFqn, calleeFqn)
+                    // calleeのisTestはここでは不明だが、検索キーとしてしか使わないのでfalseで良い
+                    val calleeNode = FunctionNode.forLookup(calleeFqn)
+                    graph.addEdge(callerNode, calleeNode)
                 }
             }
+        }
+    }
+
+    /**
+     * 関数に@Testアノテーションが付与されているかを判定
+     *
+     * 対応アノテーション:
+     * - org.junit.Test (JUnit 4)
+     * - org.junit.jupiter.api.Test (JUnit 5)
+     * - kotlin.test.Test (kotlin-test)
+     */
+    private fun hasTestAnnotation(function: KtNamedFunction): Boolean {
+        return function.annotationEntries.any { annotation ->
+            val shortName = annotation.shortName?.asString()
+            shortName == "Test"
         }
     }
 }

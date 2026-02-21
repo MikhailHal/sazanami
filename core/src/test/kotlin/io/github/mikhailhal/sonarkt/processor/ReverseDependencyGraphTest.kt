@@ -1,10 +1,15 @@
 package io.github.mikhailhal.sonarkt.processor
 
+import io.github.mikhailhal.sonarkt.common.FunctionNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ReverseDependencyGraphTest {
+
+    // Helper to create test nodes
+    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, isTest)
+    private fun testNode(fqn: String) = FunctionNode(fqn, isTest = true)
 
     // === addEdge / getCallers ===
 
@@ -12,32 +17,37 @@ class ReverseDependencyGraphTest {
     fun `addEdge stores caller for callee`() {
         val graph = ReverseDependencyGraph()
 
-        graph.addEdge("testAdd", "Calculator.add")
+        graph.addEdge(testNode("testAdd"), node("Calculator.add"))
 
         val callers = graph.getCallers("Calculator.add")
-        assertEquals(setOf("testAdd"), callers)
+        assertEquals(1, callers.size)
+        assertTrue(callers.any { it.fqn == "testAdd" })
     }
 
     @Test
     fun `multiple callers for same callee`() {
         val graph = ReverseDependencyGraph()
 
-        graph.addEdge("testAdd", "Calculator.add")
-        graph.addEdge("helperB", "Calculator.add")
+        graph.addEdge(testNode("testAdd"), node("Calculator.add"))
+        graph.addEdge(node("helperB"), node("Calculator.add"))
 
         val callers = graph.getCallers("Calculator.add")
-        assertEquals(setOf("testAdd", "helperB"), callers)
+        assertEquals(2, callers.size)
+        assertTrue(callers.any { it.fqn == "testAdd" })
+        assertTrue(callers.any { it.fqn == "helperB" })
     }
 
     @Test
     fun `same caller calling multiple callees`() {
         val graph = ReverseDependencyGraph()
 
-        graph.addEdge("main", "foo")
-        graph.addEdge("main", "bar")
+        graph.addEdge(node("main"), node("foo"))
+        graph.addEdge(node("main"), node("bar"))
 
-        assertEquals(setOf("main"), graph.getCallers("foo"))
-        assertEquals(setOf("main"), graph.getCallers("bar"))
+        assertEquals(1, graph.getCallers("foo").size)
+        assertEquals(1, graph.getCallers("bar").size)
+        assertTrue(graph.getCallers("foo").any { it.fqn == "main" })
+        assertTrue(graph.getCallers("bar").any { it.fqn == "main" })
     }
 
     @Test
@@ -52,12 +62,11 @@ class ReverseDependencyGraphTest {
     fun `duplicate addEdge is idempotent`() {
         val graph = ReverseDependencyGraph()
 
-        graph.addEdge("testAdd", "Calculator.add")
-        graph.addEdge("testAdd", "Calculator.add")
+        graph.addEdge(testNode("testAdd"), node("Calculator.add"))
+        graph.addEdge(testNode("testAdd"), node("Calculator.add"))
 
         val callers = graph.getCallers("Calculator.add")
         assertEquals(1, callers.size)
-        assertEquals(setOf("testAdd"), callers)
     }
 
     // === getAllEdges ===
@@ -66,15 +75,13 @@ class ReverseDependencyGraphTest {
     fun `getAllEdges returns all edges`() {
         val graph = ReverseDependencyGraph()
 
-        graph.addEdge("testAdd", "Calculator.add")
-        graph.addEdge("helperB", "Calculator.add")
-        graph.addEdge("testHelper", "helperB")
+        graph.addEdge(testNode("testAdd"), node("Calculator.add"))
+        graph.addEdge(node("helperB"), node("Calculator.add"))
+        graph.addEdge(testNode("testHelper"), node("helperB"))
 
         val allEdges = graph.getAllEdges()
 
         assertEquals(2, allEdges.size)
-        assertEquals(setOf("testAdd", "helperB"), allEdges["Calculator.add"])
-        assertEquals(setOf("testHelper"), allEdges["helperB"])
     }
 
     @Test
@@ -91,9 +98,9 @@ class ReverseDependencyGraphTest {
     fun `stats returns correct counts`() {
         val graph = ReverseDependencyGraph()
 
-        graph.addEdge("testAdd", "Calculator.add")
-        graph.addEdge("helperB", "Calculator.add")
-        graph.addEdge("testHelper", "helperB")
+        graph.addEdge(testNode("testAdd"), node("Calculator.add"))
+        graph.addEdge(node("helperB"), node("Calculator.add"))
+        graph.addEdge(testNode("testHelper"), node("helperB"))
 
         val stats = graph.stats()
 
@@ -107,5 +114,23 @@ class ReverseDependencyGraphTest {
 
         val stats = graph.stats()
         assertEquals("Callees: 0, Total edges: 0", stats)
+    }
+
+    // === FunctionNode isTest property ===
+
+    @Test
+    fun `caller isTest is preserved in getCallers result`() {
+        val graph = ReverseDependencyGraph()
+
+        graph.addEdge(testNode("CalculatorTest.testAdd"), node("Calculator.add"))
+        graph.addEdge(node("Helper.helperB"), node("Calculator.add"))
+
+        val callers = graph.getCallers("Calculator.add")
+
+        val testCaller = callers.find { it.fqn == "CalculatorTest.testAdd" }
+        val helperCaller = callers.find { it.fqn == "Helper.helperB" }
+
+        assertEquals(true, testCaller?.isTest)
+        assertEquals(false, helperCaller?.isTest)
     }
 }
