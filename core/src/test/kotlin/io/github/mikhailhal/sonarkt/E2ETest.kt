@@ -101,6 +101,64 @@ class E2ETest {
         }
     }
 
+    @Test
+    fun `PR diff format (origin-main---HEAD) works the same`() {
+        withSandboxFiles { ktFiles ->
+            // origin/main...HEAD 形式でも diff フォーマットは同じ
+            // 変わるのは含まれるコミット範囲だけ
+            val diff = """
+                diff --git a/src/test/resources/sandbox/Calculator.kt b/src/test/resources/sandbox/Calculator.kt
+                --- a/src/test/resources/sandbox/Calculator.kt
+                +++ b/src/test/resources/sandbox/Calculator.kt
+                @@ -4 +4 @@
+                -    fun add(a: Int, b: Int): Int = a + b
+                +    fun add(a: Int, b: Int): Int = a + b // PR change
+            """.trimIndent()
+
+            val output = runPipeline(diff, ktFiles)
+
+            assertEquals(
+                """
+                io.github.mikhailhal.sonarkt.CalculatorTest.testAdd
+                io.github.mikhailhal.sonarkt.CalculatorTest.testHelper
+                """.trimIndent(),
+                output
+            )
+        }
+    }
+
+    @Test
+    fun `multiple file changes in single PR diff`() {
+        withSandboxFiles { ktFiles ->
+            // PR で複数ファイルを変更した場合
+            val diff = """
+                diff --git a/src/test/resources/sandbox/Calculator.kt b/src/test/resources/sandbox/Calculator.kt
+                --- a/src/test/resources/sandbox/Calculator.kt
+                +++ b/src/test/resources/sandbox/Calculator.kt
+                @@ -4 +4 @@
+                -    fun add(a: Int, b: Int): Int = a + b
+                +    fun add(a: Int, b: Int): Int = a + b // change 1
+                diff --git a/src/test/resources/sandbox/Helper.kt b/src/test/resources/sandbox/Helper.kt
+                --- a/src/test/resources/sandbox/Helper.kt
+                +++ b/src/test/resources/sandbox/Helper.kt
+                @@ -8 +8 @@
+                -    val calc = Calculator()
+                +    val calc = Calculator() // change 2
+            """.trimIndent()
+
+            val output = runPipeline(diff, ktFiles)
+
+            // 両方の変更による影響テスト
+            assertEquals(
+                """
+                io.github.mikhailhal.sonarkt.CalculatorTest.testAdd
+                io.github.mikhailhal.sonarkt.CalculatorTest.testHelper
+                """.trimIndent(),
+                output
+            )
+        }
+    }
+
     // === Helper functions ===
 
     /**
