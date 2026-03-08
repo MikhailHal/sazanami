@@ -3,6 +3,7 @@ package io.github.mikhailhal.sonarkt.collector
 import com.intellij.openapi.editor.Document
 import com.intellij.psi.PsiDocumentManager
 import io.github.mikhailhal.sonarkt.common.ModuleName
+import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
@@ -89,6 +90,11 @@ class ChangedFunctionCollector {
 
     /**
      * 単一ファイル内の変更された関数を収集
+     *
+     * 変更された関数に加えて、その関数がオーバーライドしている
+     * インターフェース/抽象クラスのメソッドも収集する。
+     * これにより、実装が変更された場合にインターフェース経由で
+     * 呼び出しているテストも影響テストとして検出できる。
      */
     private fun collectChangedFunctionsInFile(
         ktFile: KtFile,
@@ -105,6 +111,8 @@ class ChangedFunctionCollector {
                         val isChangedFunction = fileDiff.overlapsWithRange(functionRange)
                         if (isChangedFunction) {
                             changedFunctions.add(ChangedFunction(fqn, moduleName))
+                            // オーバーライド元（インターフェース/抽象クラス）のメソッドも追加
+                            collectOverriddenMethods(function, moduleName, changedFunctions)
                         }
                     }
                 }
@@ -113,6 +121,28 @@ class ChangedFunctionCollector {
         })
 
         return changedFunctions
+    }
+
+    /**
+     * 関数がオーバーライドしている親メソッド（インターフェース/抽象クラス）を収集
+     *
+     * getOverriddenSymbols() は具体クラス → インタフェースクラスの方向でシンボルを取得する。
+     * 例: CalculatorImpl.compute → ICalculator.compute
+     */
+    private fun collectOverriddenMethods(
+        function: KtNamedFunction,
+        moduleName: ModuleName,
+        changedFunctions: MutableSet<ChangedFunction>
+    ) {
+        analyze(function) {
+            val symbol = function.symbol
+            symbol.allOverriddenSymbols.forEach { overriddenSymbol ->
+                val parentFqn = overriddenSymbol.callableId?.asSingleFqName()?.asString()
+                if (parentFqn != null) {
+                    changedFunctions.add(ChangedFunction(parentFqn, moduleName))
+                }
+            }
+        }
     }
 
     /**
