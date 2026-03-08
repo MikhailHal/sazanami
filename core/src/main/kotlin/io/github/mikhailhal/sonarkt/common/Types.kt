@@ -5,3 +5,9 @@ package io.github.mikhailhal.sonarkt.common
  * 例: "io.github.mikhailhal.sonarkt.Calculator.add"
  */
 typealias FunctionFqn = String
+
+/**
+ * モジュール名
+ * 例: ":core", ":plugin", ":libs:common"
+ */
+typealias ModuleName = String

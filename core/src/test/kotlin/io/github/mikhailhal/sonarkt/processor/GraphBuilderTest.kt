@@ -1,6 +1,7 @@
 package io.github.mikhailhal.sonarkt.processor
 
 import com.intellij.openapi.util.Disposer
+import io.github.mikhailhal.sonarkt.common.FunctionNode
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
 import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModule
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
@@ -17,6 +18,11 @@ import kotlin.test.assertTrue
  */
 class GraphBuilderTest {
 
+    private val testModule = "test"
+
+    // Helper to create lookup nodes
+    private fun lookup(fqn: String) = FunctionNode.forLookup(fqn, testModule)
+
     @Test
     fun `builds graph from sandbox files`() {
         val projectDisposable = Disposer.newDisposable("GraphBuilderTest")
@@ -27,7 +33,7 @@ class GraphBuilderTest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         // sandboxのみを対象にする
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
@@ -40,16 +46,24 @@ class GraphBuilderTest {
                 .filterIsInstance<KtFile>()
 
             val graphBuilder = GraphBuilder()
-            val graph = graphBuilder.build(ktFiles)
+            val graph = graphBuilder.build(mapOf(testModule to ktFiles))
 
             // Calculator.add は CalculatorTest.testAdd と helperB から呼ばれる
-            val addCallers = graph.getCallers("io.github.mikhailhal.sonarkt.Calculator.add")
-            assertTrue(addCallers.contains("io.github.mikhailhal.sonarkt.CalculatorTest.testAdd"))
-            assertTrue(addCallers.contains("io.github.mikhailhal.sonarkt.helperB"))
+            val addCallers = graph.getCallers(lookup("io.github.mikhailhal.sonarkt.Calculator.add"))
+            assertTrue(addCallers.any { it.fqn == "io.github.mikhailhal.sonarkt.CalculatorTest.testAdd" })
+            assertTrue(addCallers.any { it.fqn == "io.github.mikhailhal.sonarkt.helperB" })
 
             // helperB は CalculatorTest.testHelper から呼ばれる
-            val helperBCallers = graph.getCallers("io.github.mikhailhal.sonarkt.helperB")
-            assertTrue(helperBCallers.contains("io.github.mikhailhal.sonarkt.CalculatorTest.testHelper"))
+            val helperBCallers = graph.getCallers(lookup("io.github.mikhailhal.sonarkt.helperB"))
+            assertTrue(helperBCallers.any { it.fqn == "io.github.mikhailhal.sonarkt.CalculatorTest.testHelper" })
+
+            // @Test annotation detection: testAdd should have isTest = true
+            val testAddCaller = addCallers.find { it.fqn == "io.github.mikhailhal.sonarkt.CalculatorTest.testAdd" }
+            assertTrue(testAddCaller?.isTest == true, "testAdd should have @Test annotation")
+
+            // helperB should have isTest = false (no @Test annotation)
+            val helperBCaller = addCallers.find { it.fqn == "io.github.mikhailhal.sonarkt.helperB" }
+            assertTrue(helperBCaller?.isTest == false, "helperB should not have @Test annotation")
 
         } finally {
             Disposer.dispose(projectDisposable)
@@ -59,7 +73,7 @@ class GraphBuilderTest {
     @Test
     fun `empty file list returns empty graph`() {
         val graphBuilder = GraphBuilder()
-        val graph = graphBuilder.build(emptyList())
+        val graph = graphBuilder.build(emptyMap())
 
         assertTrue(graph.getAllEdges().isEmpty())
     }

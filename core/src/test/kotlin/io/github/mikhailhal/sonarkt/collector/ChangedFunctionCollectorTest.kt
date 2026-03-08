@@ -18,6 +18,11 @@ import kotlin.test.assertTrue
  */
 class ChangedFunctionCollectorTest {
 
+    // テスト用のモジュール名とマッピング
+    private val testModule = "test"
+    private val modulePathMapping = mapOf(testModule to "src/test/resources/sandbox")
+    private val projectRoot = Paths.get("").toAbsolutePath()
+
     // === collect ===
 
     @Test
@@ -30,7 +35,7 @@ class ChangedFunctionCollectorTest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
                     })
@@ -52,9 +57,12 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
-            assertEquals(setOf("io.github.mikhailhal.sonarkt.Calculator.add"), changed)
+            assertEquals(
+                setOf(ChangedFunction("io.github.mikhailhal.sonarkt.Calculator.add", testModule)),
+                changed
+            )
         } finally {
             Disposer.dispose(projectDisposable)
         }
@@ -70,7 +78,7 @@ class ChangedFunctionCollectorTest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
                     })
@@ -94,12 +102,12 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
             assertEquals(
                 setOf(
-                    "io.github.mikhailhal.sonarkt.Calculator.add",
-                    "io.github.mikhailhal.sonarkt.Calculator.multiply"
+                    ChangedFunction("io.github.mikhailhal.sonarkt.Calculator.add", testModule),
+                    ChangedFunction("io.github.mikhailhal.sonarkt.Calculator.multiply", testModule)
                 ),
                 changed
             )
@@ -118,7 +126,7 @@ class ChangedFunctionCollectorTest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
                     })
@@ -140,9 +148,9 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
-            assertEquals(setOf("io.github.mikhailhal.sonarkt.helperB"), changed)
+            assertEquals(setOf(ChangedFunction("io.github.mikhailhal.sonarkt.helperB", testModule)), changed)
         } finally {
             Disposer.dispose(projectDisposable)
         }
@@ -160,7 +168,7 @@ class ChangedFunctionCollectorTest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
                     })
@@ -172,7 +180,7 @@ class ChangedFunctionCollectorTest {
                 .filterIsInstance<KtFile>()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect("", ktFiles)
+            val changed = collector.collect("", ktFiles, modulePathMapping, projectRoot)
 
             assertTrue(changed.isEmpty())
         } finally {
@@ -192,7 +200,7 @@ class ChangedFunctionCollectorTest {
         """.trimIndent()
 
         val collector = ChangedFunctionCollector()
-        val changed = collector.collect(diffOutput, emptyList())
+        val changed = collector.collect(diffOutput, emptyList(), modulePathMapping, projectRoot)
 
         assertTrue(changed.isEmpty())
     }
@@ -207,7 +215,7 @@ class ChangedFunctionCollectorTest {
                     platform = JvmPlatforms.defaultJvmPlatform
 
                     addModule(buildKtSourceModule {
-                        moduleName = "test"
+                        moduleName = testModule
                         platform = JvmPlatforms.defaultJvmPlatform
                         addSourceRoot(Paths.get("src/test/resources/sandbox"))
                     })
@@ -229,7 +237,7 @@ class ChangedFunctionCollectorTest {
             """.trimIndent()
 
             val collector = ChangedFunctionCollector()
-            val changed = collector.collect(diffOutput, ktFiles)
+            val changed = collector.collect(diffOutput, ktFiles, modulePathMapping, projectRoot)
 
             assertTrue(changed.isEmpty())
         } finally {

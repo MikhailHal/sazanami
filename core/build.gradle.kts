@@ -7,7 +7,7 @@ plugins {
 val kotlinVersion = "2.1.20"
 
 application {
-    mainClass.set("io.github.sonarkt.MainKt")
+    mainClass.set("io.github.mikhailhal.sonarkt.MainKt")
 }
 
 repositories {

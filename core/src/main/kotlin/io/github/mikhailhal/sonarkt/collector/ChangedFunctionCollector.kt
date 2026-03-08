@@ -2,10 +2,13 @@ package io.github.mikhailhal.sonarkt.collector
 
 import com.intellij.openapi.editor.Document
 import com.intellij.psi.PsiDocumentManager
-import io.github.mikhailhal.sonarkt.common.FunctionFqn
+import io.github.mikhailhal.sonarkt.common.ModuleName
+import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * git diffから変更された関数を特定するCollector
@@ -20,27 +23,38 @@ import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
 class ChangedFunctionCollector {
 
     /**
-     * 変更された関数のFQNを収集
+     * 変更された関数を収集
      *
      * @param diffOutput git diff --unified=0 の出力
      * @param ktFiles 解析対象のKtFileリスト
-     * @return 変更された関数のFQN集合
+     * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング
+     *                         例: mapOf(":core" to "core", ":plugin" to "plugin")
+     * @param projectRoot プロジェクトルートの絶対パス（相対パス計算に使用）
+     * @return 変更された関数の集合
      */
-    fun collect(diffOutput: String, ktFiles: List<KtFile>): Set<FunctionFqn> {
+    fun collect(
+        diffOutput: String,
+        ktFiles: List<KtFile>,
+        modulePathMapping: Map<ModuleName, String>,
+        projectRoot: Path
+    ): Set<ChangedFunction> {
         val fileDiffs = GitDiffParser.parseKotlinFiles(diffOutput)
-        val changedFunctions = mutableSetOf<FunctionFqn>()
+        val changedFunctions = mutableSetOf<ChangedFunction>()
 
         if (fileDiffs.isEmpty()) return emptySet()
 
         for (ktFile in ktFiles) {
-            // ファイルパスをリポジトリルートからの相対パスに変換して照合
+            // ファイルパスをプロジェクトルートからの相対パスに変換して照合
             val filePath = ktFile.virtualFile?.path ?: continue
-            val relativePath = extractRelativePath(filePath)
+            val relativePath = extractRelativePath(filePath, projectRoot)
 
             val fileDiff = fileDiffs[relativePath] ?: continue
 
+            // ファイルパスからモジュール名を解決
+            val moduleName = resolveModuleName(relativePath, modulePathMapping)
+
             // このファイルの変更された関数を収集
-            val functions = collectChangedFunctionsInFile(ktFile, fileDiff)
+            val functions = collectChangedFunctionsInFile(ktFile, fileDiff, moduleName)
             changedFunctions.addAll(functions)
         }
 
@@ -48,13 +62,46 @@ class ChangedFunctionCollector {
     }
 
     /**
+     * ファイルパスからモジュール名を解決
+     *
+     * 最長プレフィックスマッチングでモジュールを特定する。
+     * 例: "core/src/main/kotlin/Foo.kt" → ":core"
+     *
+     * @param filePath リポジトリルートからの相対パス
+     * @param modulePathMapping モジュール名 → モジュールルートパスのマッピング
+     * @return 該当するモジュール名、見つからない場合は空文字列
+     */
+    private fun resolveModuleName(
+        filePath: String,
+        modulePathMapping: Map<ModuleName, String>
+    ): ModuleName {
+        var bestMatch: ModuleName = ""
+        var bestMatchLength = 0
+
+        for ((moduleName, modulePath) in modulePathMapping) {
+            if (filePath.startsWith(modulePath) && modulePath.length > bestMatchLength) {
+                bestMatch = moduleName
+                bestMatchLength = modulePath.length
+            }
+        }
+
+        return bestMatch
+    }
+
+    /**
      * 単一ファイル内の変更された関数を収集
+     *
+     * 変更された関数に加えて、その関数がオーバーライドしている
+     * インターフェース/抽象クラスのメソッドも収集する。
+     * これにより、実装が変更された場合にインターフェース経由で
+     * 呼び出しているテストも影響テストとして検出できる。
      */
     private fun collectChangedFunctionsInFile(
         ktFile: KtFile,
-        fileDiff: FileDiff
-    ): Set<FunctionFqn> {
-        val changedFunctions = mutableSetOf<FunctionFqn>()
+        fileDiff: FileDiff,
+        moduleName: ModuleName
+    ): Set<ChangedFunction> {
+        val changedFunctions = mutableSetOf<ChangedFunction>()
         val document = getDocument(ktFile) ?: return emptySet()
 
         ktFile.accept(object : KtTreeVisitorVoid() {
@@ -63,7 +110,9 @@ class ChangedFunctionCollector {
                     getFunctionLineRange(function, document)?.let { functionRange ->
                         val isChangedFunction = fileDiff.overlapsWithRange(functionRange)
                         if (isChangedFunction) {
-                            changedFunctions.add(fqn)
+                            changedFunctions.add(ChangedFunction(fqn, moduleName))
+                            // オーバーライド元（インターフェース/抽象クラス）のメソッドも追加
+                            collectOverriddenMethods(function, moduleName, changedFunctions)
                         }
                     }
                 }
@@ -72,6 +121,28 @@ class ChangedFunctionCollector {
         })
 
         return changedFunctions
+    }
+
+    /**
+     * 関数がオーバーライドしている親メソッド（インターフェース/抽象クラス）を収集
+     *
+     * getOverriddenSymbols() は具体クラス → インタフェースクラスの方向でシンボルを取得する。
+     * 例: CalculatorImpl.compute → ICalculator.compute
+     */
+    private fun collectOverriddenMethods(
+        function: KtNamedFunction,
+        moduleName: ModuleName,
+        changedFunctions: MutableSet<ChangedFunction>
+    ) {
+        analyze(function) {
+            val symbol = function.symbol
+            symbol.allOverriddenSymbols.forEach { overriddenSymbol ->
+                val parentFqn = overriddenSymbol.callableId?.asSingleFqName()?.asString()
+                if (parentFqn != null) {
+                    changedFunctions.add(ChangedFunction(parentFqn, moduleName))
+                }
+            }
+        }
     }
 
     /**
@@ -98,19 +169,20 @@ class ChangedFunctionCollector {
     }
 
     /**
-     * ファイルパスからリポジトリルートからの相対パスを抽出
+     * ファイルパスからプロジェクトルートからの相対パスを計算
      *
-     * TODO: 現在は簡易実装。実際にはプロジェクトルートを基準に計算すべき
-     * 例: /home/user/project/src/main/Foo.kt → src/main/Foo.kt
+     * @param absolutePath ファイルの絶対パス
+     * @param projectRoot プロジェクトルートの絶対パス
+     * @return プロジェクトルートからの相対パス
      */
-    private fun extractRelativePath(absolutePath: String): String {
-        // 簡易実装: src/ または test/ から始まる部分を抽出
-        val srcIndex = absolutePath.indexOf("/src/")
-        if (srcIndex >= 0) {
-            return absolutePath.substring(srcIndex + 1) // "/src/..." → "src/..."
+    private fun extractRelativePath(absolutePath: String, projectRoot: Path): String {
+        return try {
+            val absPath = Paths.get(absolutePath)
+            projectRoot.relativize(absPath).toString()
+        } catch (e: IllegalArgumentException) {
+            // 異なるルートの場合（Windowsのドライブが違うなど）
+            // フォールバック: ファイル名のみ返す
+            absolutePath.substringAfterLast("/")
         }
-
-        // フォールバック: ファイル名のみ返す（完全一致は期待できない）
-        return absolutePath.substringAfterLast("/")
     }
 }

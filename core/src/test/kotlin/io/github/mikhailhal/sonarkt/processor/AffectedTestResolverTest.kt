@@ -1,20 +1,30 @@
 package io.github.mikhailhal.sonarkt.processor
 
+import io.github.mikhailhal.sonarkt.collector.ChangedFunction
+import io.github.mikhailhal.sonarkt.common.FunctionNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AffectedTestResolverTest {
 
+    // テスト用のデフォルトモジュール名
+    private val testModule = ":test"
+
+    // Helper to create nodes
+    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, testModule, isTest)
+    private fun testNode(fqn: String) = FunctionNode(fqn, testModule, isTest = true)
+    private fun changed(fqn: String) = ChangedFunction(fqn, testModule)
+
     // === Basic detection ===
 
     @Test
     fun `direct caller is test function`() {
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorTest.testAdd", "com.example.Calculator.add")
+        graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
     }
@@ -23,11 +33,11 @@ class AffectedTestResolverTest {
     fun `transitive detection through helper`() {
         // testHelper -> helperB -> Calculator.add
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.helperB", "com.example.Calculator.add")
-        graph.addEdge("com.example.CalculatorTest.testHelper", "com.example.helperB")
+        graph.addEdge(node("com.example.helperB"), node("com.example.Calculator.add"))
+        graph.addEdge(testNode("com.example.CalculatorTest.testHelper"), node("com.example.helperB"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(setOf("com.example.CalculatorTest.testHelper"), affected)
     }
@@ -35,11 +45,11 @@ class AffectedTestResolverTest {
     @Test
     fun `multiple tests affected`() {
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorTest.testAdd", "com.example.Calculator.add")
-        graph.addEdge("com.example.CalculatorTest.testAddNegative", "com.example.Calculator.add")
+        graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
+        graph.addEdge(testNode("com.example.CalculatorTest.testAddNegative"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.Calculator.add"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
 
         assertEquals(
             setOf(
@@ -53,12 +63,12 @@ class AffectedTestResolverTest {
     @Test
     fun `multiple changed functions`() {
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorTest.testAdd", "com.example.Calculator.add")
-        graph.addEdge("com.example.CalculatorTest.testMultiply", "com.example.Calculator.multiply")
+        graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
+        graph.addEdge(testNode("com.example.CalculatorTest.testMultiply"), node("com.example.Calculator.multiply"))
 
         val resolver = AffectedTestResolver(graph)
         val affected = resolver.findAffectedTests(
-            setOf("com.example.Calculator.add", "com.example.Calculator.multiply")
+            setOf(changed("com.example.Calculator.add"), changed("com.example.Calculator.multiply"))
         )
 
         assertEquals(
@@ -75,11 +85,11 @@ class AffectedTestResolverTest {
         // testA -> testB -> changed
         // Both should be detected because testA might call testB with different args
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.SomeTest.testB", "com.example.changed")
-        graph.addEdge("com.example.SomeTest.testA", "com.example.SomeTest.testB")
+        graph.addEdge(testNode("com.example.SomeTest.testB"), node("com.example.changed"))
+        graph.addEdge(testNode("com.example.SomeTest.testA"), testNode("com.example.SomeTest.testB"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.changed"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.changed")))
 
         assertEquals(
             setOf(
@@ -95,7 +105,7 @@ class AffectedTestResolverTest {
     @Test
     fun `empty changed functions returns empty set`() {
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorTest.testAdd", "com.example.Calculator.add")
+        graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
         val affected = resolver.findAffectedTests(emptySet())
@@ -108,7 +118,7 @@ class AffectedTestResolverTest {
         val graph = ReverseDependencyGraph()
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.unused"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.unused")))
 
         assertTrue(affected.isEmpty())
     }
@@ -117,72 +127,65 @@ class AffectedTestResolverTest {
     fun `cycle in graph does not cause infinite loop`() {
         // a -> b -> c -> a (cycle)
         val graph = ReverseDependencyGraph()
-        graph.addEdge("b", "a")
-        graph.addEdge("c", "b")
-        graph.addEdge("a", "c")
-        graph.addEdge("com.example.SomeTest.testA", "a")
+        graph.addEdge(node("b"), node("a"))
+        graph.addEdge(node("c"), node("b"))
+        graph.addEdge(node("a"), node("c"))
+        graph.addEdge(testNode("com.example.SomeTest.testA"), node("a"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("a"))
+        val affected = resolver.findAffectedTests(setOf(changed("a")))
 
         // Should complete without hanging
         assertEquals(setOf("com.example.SomeTest.testA"), affected)
     }
 
-    // === isTestFunction detection ===
+    // === @Test annotation detection ===
 
     @Test
-    fun `function name starting with test is detected`() {
+    fun `function with isTest true is detected`() {
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.Helper.testSomething", "com.example.foo")
+        graph.addEdge(testNode("com.example.Helper.testSomething"), node("com.example.foo"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.foo")))
 
         assertEquals(setOf("com.example.Helper.testSomething"), affected)
     }
 
     @Test
-    fun `class ending with Test is detected`() {
+    fun `function with isTest false is not in result`() {
         val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorTest.add", "com.example.foo")
+        graph.addEdge(node("com.example.Helper.doSomething"), node("com.example.foo"))
 
         val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
-
-        assertEquals(setOf("com.example.CalculatorTest.add"), affected)
-    }
-
-    @Test
-    fun `class ending with Tests is detected`() {
-        val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorTests.add", "com.example.foo")
-
-        val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
-
-        assertEquals(setOf("com.example.CalculatorTests.add"), affected)
-    }
-
-    @Test
-    fun `class ending with Spec is detected`() {
-        val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.CalculatorSpec.add", "com.example.foo")
-
-        val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
-
-        assertEquals(setOf("com.example.CalculatorSpec.add"), affected)
-    }
-
-    @Test
-    fun `non-test function is not in result`() {
-        val graph = ReverseDependencyGraph()
-        graph.addEdge("com.example.Helper.doSomething", "com.example.foo")
-
-        val resolver = AffectedTestResolver(graph)
-        val affected = resolver.findAffectedTests(setOf("com.example.foo"))
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.foo")))
 
         assertTrue(affected.isEmpty())
+    }
+
+    @Test
+    fun `mixed test and non-test callers`() {
+        val graph = ReverseDependencyGraph()
+        graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
+        graph.addEdge(node("com.example.Helper.helper"), node("com.example.Calculator.add"))
+
+        val resolver = AffectedTestResolver(graph)
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
+
+        // Only the test function should be in result
+        assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
+    }
+
+    @Test
+    fun `helper function leads to test`() {
+        // testAdd -> helper -> Calculator.add
+        val graph = ReverseDependencyGraph()
+        graph.addEdge(node("com.example.Helper.helper"), node("com.example.Calculator.add"))
+        graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Helper.helper"))
+
+        val resolver = AffectedTestResolver(graph)
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
+
+        assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
     }
 }
