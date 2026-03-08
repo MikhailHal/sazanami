@@ -165,6 +165,49 @@ class E2ETest {
         }
     }
 
+    // === Interface support tests ===
+
+    @Test
+    fun `changing implementation method detects tests calling interface method`() {
+        withSandboxFiles { ktFiles ->
+            // CalculatorImpl.compute を変更したdiff
+            // テストは ICalculator.compute 経由で呼び出している
+            val diff = """
+                diff --git a/src/test/resources/sandbox/CalculatorImpl.kt b/src/test/resources/sandbox/CalculatorImpl.kt
+                --- a/src/test/resources/sandbox/CalculatorImpl.kt
+                +++ b/src/test/resources/sandbox/CalculatorImpl.kt
+                @@ -8 +8 @@
+                -    override fun compute(a: Int, b: Int): Int = a + b
+                +    override fun compute(a: Int, b: Int): Int = a + b // modified
+            """.trimIndent()
+
+            val output = runPipeline(diff, ktFiles)
+
+            // CalculatorImpl.compute の変更で、ICalculator.compute 経由のテストが検出される
+            assertEquals("io.github.mikhailhal.sonarkt.InterfaceTest.testCompute", output)
+        }
+    }
+
+    @Test
+    fun `changing interface method itself detects calling tests`() {
+        withSandboxFiles { ktFiles ->
+            // ICalculator.compute を直接変更したdiff（署名の変更など）
+            val diff = """
+                diff --git a/src/test/resources/sandbox/ICalculator.kt b/src/test/resources/sandbox/ICalculator.kt
+                --- a/src/test/resources/sandbox/ICalculator.kt
+                +++ b/src/test/resources/sandbox/ICalculator.kt
+                @@ -8 +8 @@
+                -    fun compute(a: Int, b: Int): Int
+                +    fun compute(a: Int, b: Int): Int // modified signature comment
+            """.trimIndent()
+
+            val output = runPipeline(diff, ktFiles)
+
+            // ICalculator.compute を直接変更した場合もテストが検出される
+            assertEquals("io.github.mikhailhal.sonarkt.InterfaceTest.testCompute", output)
+        }
+    }
+
     // === Helper functions ===
 
     /**
