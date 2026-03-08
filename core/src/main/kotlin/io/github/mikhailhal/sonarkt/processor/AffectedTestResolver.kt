@@ -74,7 +74,8 @@ class AffectedTestResolver(
             seen.add(callee)
 
             // callee(関数本体)を呼んでいる全関数を取得
-            val callers = graph.getCallers(callee)
+            // FQNのみで検索（クロスモジュール呼び出しに対応）
+            val callers = graph.getCallersByFqn(callee.fqn)
             for (caller in callers) {
                 // @Testアノテーションが付与されている関数のみを影響テストとして追加
                 if (caller.isTest) {

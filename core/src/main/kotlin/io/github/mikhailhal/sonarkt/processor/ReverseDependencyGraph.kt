@@ -35,6 +35,33 @@ class ReverseDependencyGraph {
     }
 
     /**
+     * FQNのみでcalleeを検索し、呼んでいる関数（caller）の一覧を取得
+     *
+     * クロスモジュール呼び出しでは、GraphBuilderがcalleeのモジュール名を
+     * 正確に特定できないため、FQNのみで検索する必要がある。
+     *
+     * 例: moduleB.AppService.execute が moduleA.CoreService.process を呼ぶ場合
+     *   - GraphBuilder: calleeを (CoreService.process, moduleB) として登録
+     *   - ChangedFunctionCollector: (CoreService.process, moduleA) として検出
+     *   - FQNのみで検索することで、モジュール名の不一致を回避
+     *   - モジュール間にてFQNが重複した場合：
+     *     - 現時点ではどちらも検出する仕様となっている
+     *     - 一方で、本ケースは低確率のため対応を保留とする
+     *
+     * @param fqn 検索する関数の完全修飾名
+     * @return calleeを呼んでいる全caller（複数モジュールにまたがる可能性あり）
+     */
+    fun getCallersByFqn(fqn: String): Set<FunctionNode> {
+        val result = mutableSetOf<FunctionNode>()
+        for ((callee, callers) in edges) {
+            if (callee.fqn == fqn) {
+                result.addAll(callers)
+            }
+        }
+        return result
+    }
+
+    /**
      * グラフの全エントリを取得（デバッグ用）
      */
     fun getAllEdges(): Map<FunctionNode, Set<FunctionNode>> {

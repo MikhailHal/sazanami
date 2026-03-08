@@ -3,6 +3,7 @@ package io.github.mikhailhal.sonarkt.gradle
 import io.github.mikhailhal.sonarkt.SonarKt
 import io.github.mikhailhal.sonarkt.common.ModuleName
 import org.gradle.api.DefaultTask
+import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Optional
@@ -40,10 +41,17 @@ abstract class AffectedTestsTask : DefaultTask() {
             return
         }
 
+        val moduleDependencies = collectModuleDependencies()
         logger.lifecycle("Detected modules: ${moduleSourceRoots.keys.joinToString(", ")}")
 
         val projectRoot = project.rootProject.projectDir.toPath()
-        val output = SonarKt.findAffectedTestsAsString(diff, moduleSourceRoots, modulePathMapping, projectRoot)
+        val output = SonarKt.findAffectedTestsAsString(
+            diff,
+            moduleSourceRoots,
+            modulePathMapping,
+            projectRoot,
+            moduleDependencies
+        )
 
         if (output.isNotEmpty()) {
             logger.lifecycle("Affected tests:")
@@ -122,5 +130,34 @@ abstract class AffectedTestsTask : DefaultTask() {
         }
 
         return roots
+    }
+
+    /**
+     * モジュール間の依存関係を収集
+     *
+     * @return モジュール名 → 依存モジュール名セットのマッピング
+     */
+    private fun collectModuleDependencies(): Map<ModuleName, Set<ModuleName>> {
+        val dependencies = mutableMapOf<ModuleName, MutableSet<ModuleName>>()
+
+        val allProjects = listOf(project.rootProject) + project.rootProject.subprojects
+
+        for (proj in allProjects) {
+            val moduleName: ModuleName = proj.path.ifEmpty { ":" }
+
+            // 解決可能なconfigurationからProjectDependencyを収集
+            proj.configurations
+                .filter { it.isCanBeResolved }
+                .forEach { config ->
+                    config.allDependencies
+                        .filterIsInstance<ProjectDependency>()
+                        .forEach { dep ->
+                            val depPath = dep.path
+                            dependencies.getOrPut(moduleName) { mutableSetOf() }.add(depPath)
+                        }
+                }
+        }
+
+        return dependencies
     }
 }
