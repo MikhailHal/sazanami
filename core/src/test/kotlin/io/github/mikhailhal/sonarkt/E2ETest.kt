@@ -6,6 +6,7 @@ import io.github.mikhailhal.sonarkt.common.ModuleName
 import io.github.mikhailhal.sonarkt.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sonarkt.processor.AffectedTestResolver
 import io.github.mikhailhal.sonarkt.processor.GraphBuilder
+import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
 import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModule
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
@@ -165,6 +166,29 @@ class E2ETest {
         }
     }
 
+    // === Cross-module support tests ===
+
+    @Test
+    fun `changing function in moduleA detects test in moduleB that calls it`() {
+        withCrossModuleFiles { moduleFiles, pathMapping ->
+            // moduleA の CoreService.process を変更
+            val diff = """
+                diff --git a/src/test/resources/sandbox/moduleA/CoreService.kt b/src/test/resources/sandbox/moduleA/CoreService.kt
+                --- a/src/test/resources/sandbox/moduleA/CoreService.kt
+                +++ b/src/test/resources/sandbox/moduleA/CoreService.kt
+                @@ -8 +8 @@
+                -    fun process(input: String): String = "processed: ${'$'}input"
+                +    fun process(input: String): String = "processed: ${'$'}input" // modified
+            """.trimIndent()
+
+            val output = runCrossModulePipeline(diff, moduleFiles, pathMapping)
+
+            // moduleB の AppServiceTest.testExecute が影響を受ける
+            // AppServiceTest → AppService.execute → CoreService.process
+            assertEquals("io.github.mikhailhal.sonarkt.moduleb.AppServiceTest.testExecute", output)
+        }
+    }
+
     // === Interface support tests ===
 
     @Test
@@ -252,6 +276,78 @@ class E2ETest {
                 .mapValues { (_, files) -> files.filterIsInstance<KtFile>() }
 
             block(moduleFiles)
+        } finally {
+            Disposer.dispose(projectDisposable)
+        }
+    }
+
+    // === Cross-module helpers ===
+
+    /**
+     * クロスモジュール用パイプラインを実行
+     */
+    private fun runCrossModulePipeline(
+        diff: String,
+        moduleFiles: Map<ModuleName, List<KtFile>>,
+        pathMapping: Map<ModuleName, String>
+    ): String {
+        val allKtFiles = moduleFiles.values.flatten()
+        val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, pathMapping, projectRoot)
+
+        val graph = GraphBuilder().build(moduleFiles)
+        val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
+
+        return AffectedTestEmitter.emit(affectedTests)
+    }
+
+    /**
+     * クロスモジュールファイルでAnalysis APIセッションを構築
+     * moduleB が moduleA に依存する構成
+     */
+    private fun withCrossModuleFiles(
+        block: (Map<ModuleName, List<KtFile>>, Map<ModuleName, String>) -> Unit
+    ) {
+        val projectDisposable = Disposer.newDisposable("E2ETest-CrossModule")
+
+        val moduleA = "moduleA"
+        val moduleB = "moduleB"
+        val pathMapping = mapOf(
+            moduleA to "src/test/resources/sandbox/moduleA",
+            moduleB to "src/test/resources/sandbox/moduleB"
+        )
+
+        try {
+            val session = buildStandaloneAnalysisAPISession(projectDisposable) {
+                buildKtModuleProvider {
+                    platform = JvmPlatforms.defaultJvmPlatform
+
+                    // モジュールをマップに保持
+                    val builtModules = mutableMapOf<ModuleName, KaModule>()
+
+                    // moduleA を先に構築（依存先）
+                    val modA = addModule(buildKtSourceModule {
+                        moduleName = moduleA
+                        this.platform = JvmPlatforms.defaultJvmPlatform
+                        addSourceRoot(Paths.get("src/test/resources/sandbox/moduleA"))
+                    })
+                    builtModules[moduleA] = modA
+
+                    // moduleB を構築（moduleA に依存）
+                    val modB = addModule(buildKtSourceModule {
+                        moduleName = moduleB
+                        this.platform = JvmPlatforms.defaultJvmPlatform
+                        addSourceRoot(Paths.get("src/test/resources/sandbox/moduleB"))
+                        addRegularDependency(modA)
+                    })
+                    builtModules[moduleB] = modB
+                }
+            }
+
+            val moduleFiles = session.modulesWithFiles
+                .mapKeys { (kaModule, _) -> kaModule.name }
+                .mapValues { (_, files) -> files.filterIsInstance<KtFile>() }
+
+            block(moduleFiles, pathMapping)
         } finally {
             Disposer.dispose(projectDisposable)
         }
