@@ -24,10 +24,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Get version from build.gradle.kts
+      - name: Get version from plugin/build.gradle.kts
         id: version
         run: |
-          VERSION=$(grep 'version = ' build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          VERSION=$(grep 'version = ' plugin/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
 
