@@ -17,14 +17,14 @@ dependencies {
 }
 
 gradlePlugin {
-    website = "https://github.com/MikhailHal/sonar-kt"
-    vcsUrl = "https://github.com/MikhailHal/sonar-kt"
+    website = "https://github.com/MikhailHal/sazanami"
+    vcsUrl = "https://github.com/MikhailHal/sazanami"
 
     plugins {
-        create("sonarKt") {
-            id = "io.github.mikhailhal.sonarkt"
-            implementationClass = "io.github.mikhailhal.sonarkt.gradle.SonarKtPlugin"
-            displayName = "sonar-kt"
+        create("sazanami") {
+            id = "io.github.mikhailhal.sazanami"
+            implementationClass = "io.github.mikhailhal.sazanami.gradle.SazanamiPlugin"
+            displayName = "sazanami"
             description = "Affected test selection for Kotlin - run only tests that matter"
             tags = listOf("kotlin", "testing", "affected-tests", "test-selection")
         }
