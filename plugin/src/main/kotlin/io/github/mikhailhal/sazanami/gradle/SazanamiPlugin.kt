@@ -18,7 +18,7 @@ import org.gradle.api.Project
  * ```
  *
  * Tasks:
- * - affectedTests: 変更されたコードに影響を受けるテストを検出
+ * - affectedTests: 変更されたコードに影響を受けるテストを検出するタスク
  */
 class SazanamiPlugin : Plugin<Project> {
     override fun apply(project: Project) {
