@@ -1,10 +1,10 @@
 plugins {
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish") version "1.3.1"
+    id("com.gradle.plugin-publish") version "2.1.1"
 }
 
 group = "io.github.mikhailhal"
-version = "0.2.0"
+version = "0.1.0"
 
 repositories {
     maven("https://redirector.kotlinlang.org/maven/intellij-dependencies")
