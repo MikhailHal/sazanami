@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.mikhailhal"
-version = "0.1.0"
+version = "0.2.1"
 
 repositories {
     maven("https://redirector.kotlinlang.org/maven/intellij-dependencies")
