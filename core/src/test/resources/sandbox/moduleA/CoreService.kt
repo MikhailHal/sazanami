@@ -1,4 +1,4 @@
-package io.github.mikhailhal.sonarkt.modulea
+package io.github.mikhailhal.sazanami.modulea
 
 /**
  * モジュールAのコアサービス

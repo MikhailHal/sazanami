@@ -1,4 +1,4 @@
-package io.github.mikhailhal.sonarkt
+package io.github.mikhailhal.sazanami
 
 /**
  * ICalculator の実装クラス

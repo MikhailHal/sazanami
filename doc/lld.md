@@ -4,7 +4,7 @@
 
 ```kotlin
 // 関数の識別子 (FQN)
-// 例: "io.github.sonarkt.Calculator.add"
+// 例: "io.github.sazanami.Calculator.add"
 typealias FunctionFqn = String
 
 // 逆方向依存グラフ
@@ -195,7 +195,7 @@ val session = buildStandaloneAnalysisAPISession(disposable) {
 analyze(expression) {
     val callInfo = expression.resolveToCall()
     val symbol = callInfo?.singleFunctionCallOrNull()?.symbol
-    val fqn = symbol?.callableId?.asSingleFqName()  // "io.github.sonarkt.Calculator.add"
+    val fqn = symbol?.callableId?.asSingleFqName()  // "io.github.sazanami.Calculator.add"
 }
 ```
 

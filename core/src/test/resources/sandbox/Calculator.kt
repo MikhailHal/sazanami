@@ -1,4 +1,4 @@
-package io.github.mikhailhal.sonarkt
+package io.github.mikhailhal.sazanami
 
 class Calculator {
     fun add(a: Int, b: Int): Int = a + b

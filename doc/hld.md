@@ -70,7 +70,7 @@
 ### Cache Strategy
 ```
 初回ビルド:
-  全ソース解析 → グラフ構築 → .sonar-kt/graph.bin 保存
+  全ソース解析 → グラフ構築 → .sazanami/graph.bin 保存
 
 差分ビルド:
   変更ファイルのみ再解析 → グラフ更新 → キャッシュ更新
@@ -83,10 +83,10 @@ CI実行時:
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.xxx.sonar-kt")
+    id("io.github.xxx.sazanami")
 }
 
-sonarKt {
+sazanami {
     // 出力形式
     outputFormat = "txt" // or "json"
     
@@ -94,7 +94,7 @@ sonarKt {
     targetSourceSets = listOf("main", "test")
     
     // キャッシュ場所
-    cacheDir = file(".sonar-kt")
+    cacheDir = file(".sazanami")
 }
 ```
 
@@ -111,8 +111,8 @@ sonarKt {
 
 | タスク | 説明 |
 |--------|------|
-| `sonarBuildGraph` | 依存グラフ構築・キャッシュ保存 |
-| `sonarAffectedTests` | 影響テスト出力 |
+| `sazanamiBuildGraph` | 依存グラフ構築・キャッシュ保存 |
+| `affectedTests` | 影響テスト出力 |
 
 ## Output Example
 ```txt

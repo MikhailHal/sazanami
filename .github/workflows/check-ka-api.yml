@@ -54,7 +54,7 @@ jobs:
                   {\"name\": \"Current\", \"value\": \"\`${{ steps.current.outputs.version }}\`\", \"inline\": true},
                   {\"name\": \"Latest\", \"value\": \"\`${{ steps.latest.outputs.version }}\`\", \"inline\": true}
                 ],
-                \"footer\": {\"text\": \"sonar-kt\"}
+                \"footer\": {\"text\": \"sazanami\"}
               }]
             }"
 

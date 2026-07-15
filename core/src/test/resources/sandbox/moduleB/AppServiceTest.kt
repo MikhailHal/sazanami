@@ -1,4 +1,4 @@
-package io.github.mikhailhal.sonarkt.moduleb
+package io.github.mikhailhal.sazanami.moduleb
 
 import kotlin.test.Test
 

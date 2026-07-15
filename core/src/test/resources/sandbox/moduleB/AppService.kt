@@ -1,6 +1,6 @@
-package io.github.mikhailhal.sonarkt.moduleb
+package io.github.mikhailhal.sazanami.moduleb
 
-import io.github.mikhailhal.sonarkt.modulea.CoreService
+import io.github.mikhailhal.sazanami.modulea.CoreService
 
 /**
  * モジュールBのアプリサービス
