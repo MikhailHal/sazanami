@@ -5,7 +5,7 @@ import io.github.mikhailhal.sazanami.collector.ChangedFunctionCollector
 import io.github.mikhailhal.sazanami.common.ModuleName
 import io.github.mikhailhal.sazanami.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sazanami.processor.AffectedTestResolver
-import io.github.mikhailhal.sazanami.processor.GraphBuilder
+import io.github.mikhailhal.sazanami.processor.CallGraphBuilder
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
 import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModule
@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  * 正しく出力されることを検証
  *
  * Pipeline:
- *   git diff → ChangedFunctionCollector → GraphBuilder
+ *   git diff → ChangedFunctionCollector → CallGraphBuilder
  *            → AffectedTestResolver → AffectedTestEmitter → output
  */
 class E2ETest {
@@ -243,7 +243,7 @@ class E2ETest {
         val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping, projectRoot)
 
         // 2. 依存グラフを構築
-        val graph = GraphBuilder().build(moduleFiles)
+        val graph = CallGraphBuilder().build(moduleFiles)
 
         // 3. 影響テストを解決
         val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
@@ -294,7 +294,7 @@ class E2ETest {
         val allKtFiles = moduleFiles.values.flatten()
         val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, pathMapping, projectRoot)
 
-        val graph = GraphBuilder().build(moduleFiles)
+        val graph = CallGraphBuilder().build(moduleFiles)
         val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
 
         return AffectedTestEmitter.emit(affectedTests)
