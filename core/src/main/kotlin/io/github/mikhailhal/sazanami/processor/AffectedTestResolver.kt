@@ -46,7 +46,7 @@ import io.github.mikhailhal.sazanami.common.FunctionNode
  * よって、推移的に全ての呼び出し元を影響範囲に含める保守的アプローチを採用している。
  */
 class AffectedTestResolver(
-    private val graph: ReverseDependencyGraph
+    private val graph: CallGraph
 ) {
     /**
      * 変更された関数から影響を受けるテストを特定

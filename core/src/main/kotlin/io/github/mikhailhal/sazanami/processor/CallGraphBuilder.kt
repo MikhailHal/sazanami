@@ -37,8 +37,8 @@ import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
  *   2. target = Analysis API で解決した呼び出し先関数 / 参照先プロパティ
  *   3. graph.addEdge(owner, target) で登録
  */
-class GraphBuilder {
-    private val graph = ReverseDependencyGraph()
+class CallGraphBuilder {
+    private val graph = CallGraph()
 
     /**
      * 複数モジュールのKtFileを処理してグラフを構築
@@ -46,7 +46,7 @@ class GraphBuilder {
      * @param moduleFiles モジュール名 → KtFileリストのマッピング
      * @return 構築された逆方向依存グラフ
      */
-    fun build(moduleFiles: Map<ModuleName, List<KtFile>>): ReverseDependencyGraph {
+    fun build(moduleFiles: Map<ModuleName, List<KtFile>>): CallGraph {
         for ((moduleName, files) in moduleFiles) {
             for (file in files) {
                 processFile(file, moduleName)

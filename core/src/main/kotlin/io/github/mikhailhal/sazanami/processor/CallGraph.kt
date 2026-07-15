@@ -3,11 +3,13 @@ package io.github.mikhailhal.sazanami.processor
 import io.github.mikhailhal.sazanami.common.FunctionNode
 
 /**
- * 逆方向依存グラフ
+ * コールグラフ
  *
- * 通常の依存グラフは caller → callee だが、
- * このグラフは「ある関数を変更したとき、影響を受ける関数は何か」を
- * 効率的に調べるため、callee → callers の逆向きで保持する。
+ * ノードは関数およびプロパティ、エッジは caller → callee の呼び出し/参照関係。
+ *
+ * 内部表現は逆向きの隣接リスト (callee → callers)。
+ * 「ある関数を変更したとき、影響を受ける関数は何か」を効率的に調べるため、
+ * 概念上のエッジとは逆向きで保持している。
  *
  * 例:
  *   Calculator.add が testAdd と helperB から呼ばれている場合:
@@ -16,7 +18,7 @@ import io.github.mikhailhal.sazanami.common.FunctionNode
  * FunctionNodeのequals/hashCodeはfqn + moduleNameで判定されるため、
  * マルチモジュール環境でも同じFQNを持つ異なるモジュールの関数を区別できる。
  */
-class ReverseDependencyGraph {
+class CallGraph {
     private val edges: MutableMap<FunctionNode, MutableSet<FunctionNode>> = mutableMapOf()
 
     /**
@@ -37,11 +39,11 @@ class ReverseDependencyGraph {
     /**
      * FQNのみでcalleeを検索し、呼んでいる関数（caller）の一覧を取得
      *
-     * クロスモジュール呼び出しでは、GraphBuilderがcalleeのモジュール名を
+     * クロスモジュール呼び出しでは、CallGraphBuilderがcalleeのモジュール名を
      * 正確に特定できないため、FQNのみで検索する必要がある。
      *
      * 例: moduleB.AppService.execute が moduleA.CoreService.process を呼ぶ場合
-     *   - GraphBuilder: calleeを (CoreService.process, moduleB) として登録
+     *   - CallGraphBuilder: calleeを (CoreService.process, moduleB) として登録
      *   - ChangedFunctionCollector: (CoreService.process, moduleA) として検出
      *   - FQNのみで検索することで、モジュール名の不一致を回避
      *   - モジュール間にてFQNが重複した場合：

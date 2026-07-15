@@ -5,7 +5,7 @@ import io.github.mikhailhal.sazanami.collector.ChangedFunctionCollector
 import io.github.mikhailhal.sazanami.common.ModuleName
 import io.github.mikhailhal.sazanami.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sazanami.processor.AffectedTestResolver
-import io.github.mikhailhal.sazanami.processor.GraphBuilder
+import io.github.mikhailhal.sazanami.processor.CallGraphBuilder
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
 import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModule
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
@@ -106,7 +106,7 @@ private fun runPipeline(
 ): String {
     val allKtFiles = moduleFiles.values.flatten()
     val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping, projectRoot)
-    val graph = GraphBuilder().build(moduleFiles)
+    val graph = CallGraphBuilder().build(moduleFiles)
     val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
     return AffectedTestEmitter.emit(affectedTests)
 }

@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ReverseDependencyGraphTest {
+class CallGraphTest {
 
     // テスト用のデフォルトモジュール名
     private val testModule = ":test"
@@ -18,7 +18,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `addEdge stores caller for callee`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
 
@@ -29,7 +29,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `multiple callers for same callee`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
         graph.addEdge(node("helperB"), node("Calculator.add"))
@@ -42,7 +42,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `same caller calling multiple callees`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(node("main"), node("foo"))
         graph.addEdge(node("main"), node("bar"))
@@ -55,7 +55,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `getCallers returns empty set for unknown callee`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         val callers = graph.getCallers(node("unknown.function"))
         assertTrue(callers.isEmpty())
@@ -63,7 +63,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `duplicate addEdge is idempotent`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
@@ -76,7 +76,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `getAllEdges returns all edges`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
         graph.addEdge(node("helperB"), node("Calculator.add"))
@@ -89,7 +89,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `getAllEdges returns empty map for empty graph`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         val allEdges = graph.getAllEdges()
         assertTrue(allEdges.isEmpty())
@@ -99,7 +99,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `stats returns correct counts`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(testNode("testAdd"), node("Calculator.add"))
         graph.addEdge(node("helperB"), node("Calculator.add"))
@@ -113,7 +113,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `stats for empty graph`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         val stats = graph.stats()
         assertEquals("Callees: 0, Total edges: 0", stats)
@@ -123,7 +123,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `caller isTest is preserved in getCallers result`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         graph.addEdge(testNode("CalculatorTest.testAdd"), node("Calculator.add"))
         graph.addEdge(node("Helper.helperB"), node("Calculator.add"))
@@ -141,7 +141,7 @@ class ReverseDependencyGraphTest {
 
     @Test
     fun `same fqn in different modules are distinct`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         val coreModule = ":core"
         val pluginModule = ":plugin"

@@ -11,12 +11,12 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * GraphBuilder統合テスト
+ * CallGraphBuilder統合テスト
  *
  * sandbox内のCalculator/Helper/CalculatorTestを使って
  * 依存グラフが正しく構築されることを検証
  */
-class GraphBuilderTest {
+class CallGraphBuilderTest {
 
     private val testModule = "test"
 
@@ -25,7 +25,7 @@ class GraphBuilderTest {
 
     @Test
     fun `builds graph from sandbox files`() {
-        val projectDisposable = Disposer.newDisposable("GraphBuilderTest")
+        val projectDisposable = Disposer.newDisposable("CallGraphBuilderTest")
 
         try {
             val session = buildStandaloneAnalysisAPISession(projectDisposable) {
@@ -45,7 +45,7 @@ class GraphBuilderTest {
                 .flatMap { it.value }
                 .filterIsInstance<KtFile>()
 
-            val graphBuilder = GraphBuilder()
+            val graphBuilder = CallGraphBuilder()
             val graph = graphBuilder.build(mapOf(testModule to ktFiles))
 
             // Calculator.add は CalculatorTest.testAdd と helperB から呼ばれる
@@ -72,7 +72,7 @@ class GraphBuilderTest {
 
     @Test
     fun `empty file list returns empty graph`() {
-        val graphBuilder = GraphBuilder()
+        val graphBuilder = CallGraphBuilder()
         val graph = graphBuilder.build(emptyMap())
 
         assertTrue(graph.getAllEdges().isEmpty())
