@@ -1,8 +1,9 @@
 package io.github.mikhailhal.sazanami.processor
 
 import com.intellij.psi.PsiElement
-import io.github.mikhailhal.sazanami.common.FunctionNode
+import io.github.mikhailhal.sazanami.common.CallableNode
 import io.github.mikhailhal.sazanami.common.ModuleName
+import io.github.mikhailhal.sazanami.common.NodeType
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
@@ -88,7 +89,7 @@ class CallGraphBuilder {
                 if (calleeFqn != null) {
                     // calleeのisTestとmoduleNameはここでは不明だが、検索キーとしてしか使わない
                     // 同一モジュール内の呼び出しと仮定
-                    val calleeNode = FunctionNode.forLookup(calleeFqn, moduleName)
+                    val calleeNode = CallableNode.forLookup(calleeFqn, moduleName)
                     graph.addEdge(owner, calleeNode)
                 }
             }
@@ -120,7 +121,7 @@ class CallGraphBuilder {
             if (variableSymbol is KaPropertySymbol) {
                 val propertyFqn = variableSymbol.callableId?.asSingleFqName()?.asString()
                 if (propertyFqn != null) {
-                    val propertyNode = FunctionNode.forLookup(propertyFqn, moduleName)
+                    val propertyNode = CallableNode.forLookup(propertyFqn, moduleName, NodeType.PROPERTY)
                     graph.addEdge(owner, propertyNode)
                 }
             }
@@ -144,14 +145,14 @@ class CallGraphBuilder {
      *
      * どの宣言にも属さない場合 (トップレベル初期化コード等) は null を返しスキップする。
      */
-    private fun resolveOwnerNode(expression: KtExpression, moduleName: ModuleName): FunctionNode? {
+    private fun resolveOwnerNode(expression: KtExpression, moduleName: ModuleName): CallableNode? {
         var current: PsiElement? = expression.parent
         while (current != null) {
             when (current) {
                 is KtNamedFunction -> {
                     val fqn = current.fqName?.asString()
                     if (fqn != null) {
-                        return FunctionNode(fqn, moduleName, hasTestAnnotation(current))
+                        return CallableNode(fqn, moduleName, hasTestAnnotation(current))
                     }
                     // ローカル関数: FQNを持たないため、外側の宣言へ帰属を続ける
                 }
@@ -166,7 +167,7 @@ class CallGraphBuilder {
                 is KtProperty -> {
                     val fqn = current.fqName?.asString()
                     if (fqn != null) {
-                        return FunctionNode(fqn, moduleName, isTest = false)
+                        return CallableNode(fqn, moduleName, isTest = false, nodeType = NodeType.PROPERTY)
                     }
                     // ローカル変数: FQNを持たないため、外側の宣言へ帰属を続ける
                 }

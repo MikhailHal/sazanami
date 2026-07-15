@@ -1,7 +1,7 @@
 package io.github.mikhailhal.sazanami.processor
 
 import com.intellij.openapi.util.Disposer
-import io.github.mikhailhal.sazanami.common.FunctionNode
+import io.github.mikhailhal.sazanami.common.CallableNode
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
 import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModule
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
@@ -21,7 +21,7 @@ class CallGraphBuilderTest {
     private val testModule = "test"
 
     // Helper to create lookup nodes
-    private fun lookup(fqn: String) = FunctionNode.forLookup(fqn, testModule)
+    private fun lookup(fqn: String) = CallableNode.forLookup(fqn, testModule)
 
     @Test
     fun `builds graph from sandbox files`() {

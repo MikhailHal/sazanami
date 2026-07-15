@@ -1,7 +1,7 @@
 package io.github.mikhailhal.sazanami.processor
 
 import io.github.mikhailhal.sazanami.collector.ChangedFunction
-import io.github.mikhailhal.sazanami.common.FunctionNode
+import io.github.mikhailhal.sazanami.common.CallableNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -12,8 +12,8 @@ class AffectedTestResolverTest {
     private val testModule = ":test"
 
     // Helper to create nodes
-    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, testModule, isTest)
-    private fun testNode(fqn: String) = FunctionNode(fqn, testModule, isTest = true)
+    private fun node(fqn: String, isTest: Boolean = false) = CallableNode(fqn, testModule, isTest)
+    private fun testNode(fqn: String) = CallableNode(fqn, testModule, isTest = true)
     private fun changed(fqn: String) = ChangedFunction(fqn, testModule)
 
     // === Basic detection ===

@@ -1,8 +1,8 @@
 package io.github.mikhailhal.sazanami.processor
 
 import io.github.mikhailhal.sazanami.collector.ChangedFunction
-import io.github.mikhailhal.sazanami.common.FunctionFqn
-import io.github.mikhailhal.sazanami.common.FunctionNode
+import io.github.mikhailhal.sazanami.common.CallableFqn
+import io.github.mikhailhal.sazanami.common.CallableNode
 
 /**
  * 変更された関数から影響を受けるテストを特定する
@@ -54,13 +54,13 @@ class AffectedTestResolver(
      * @param changedFunctions 変更された関数の集合
      * @return 影響を受けるテスト関数のFQN集合
      */
-    fun findAffectedTests(changedFunctions: Set<ChangedFunction>): Set<FunctionFqn> {
-        val affectedTests = mutableSetOf<FunctionFqn>()
-        val seen = mutableSetOf<FunctionNode>()
+    fun findAffectedTests(changedFunctions: Set<ChangedFunction>): Set<CallableFqn> {
+        val affectedTests = mutableSetOf<CallableFqn>()
+        val seen = mutableSetOf<CallableNode>()
 
-        // ChangedFunctionをFunctionNodeに変換してキューに入れる
+        // ChangedFunctionをCallableNodeに変換してキューに入れる
         val queue = ArrayDeque(changedFunctions.map {
-            FunctionNode.forLookup(it.fqn, it.moduleName)
+            CallableNode.forLookup(it.fqn, it.moduleName)
         })
 
         while (queue.isNotEmpty()) {

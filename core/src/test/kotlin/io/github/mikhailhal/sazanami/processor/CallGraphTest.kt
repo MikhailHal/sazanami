@@ -1,6 +1,6 @@
 package io.github.mikhailhal.sazanami.processor
 
-import io.github.mikhailhal.sazanami.common.FunctionNode
+import io.github.mikhailhal.sazanami.common.CallableNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -11,8 +11,8 @@ class CallGraphTest {
     private val testModule = ":test"
 
     // Helper to create test nodes
-    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, testModule, isTest)
-    private fun testNode(fqn: String) = FunctionNode(fqn, testModule, isTest = true)
+    private fun node(fqn: String, isTest: Boolean = false) = CallableNode(fqn, testModule, isTest)
+    private fun testNode(fqn: String) = CallableNode(fqn, testModule, isTest = true)
 
     // === addEdge / getCallers ===
 
@@ -119,7 +119,7 @@ class CallGraphTest {
         assertEquals("Callees: 0, Total edges: 0", stats)
     }
 
-    // === FunctionNode isTest property ===
+    // === CallableNode isTest property ===
 
     @Test
     fun `caller isTest is preserved in getCallers result`() {
@@ -146,8 +146,8 @@ class CallGraphTest {
         val coreModule = ":core"
         val pluginModule = ":plugin"
 
-        val coreCallee = FunctionNode("com.example.Util.foo", coreModule, isTest = false)
-        val pluginCallee = FunctionNode("com.example.Util.foo", pluginModule, isTest = false)
+        val coreCallee = CallableNode("com.example.Util.foo", coreModule, isTest = false)
+        val pluginCallee = CallableNode("com.example.Util.foo", pluginModule, isTest = false)
 
         graph.addEdge(testNode("testCore"), coreCallee)
         graph.addEdge(testNode("testPlugin"), pluginCallee)
