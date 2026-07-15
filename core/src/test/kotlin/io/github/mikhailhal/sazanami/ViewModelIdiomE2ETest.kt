@@ -11,7 +11,6 @@ import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModu
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
 import java.nio.file.Paths
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -133,9 +132,11 @@ class ViewModelIdiomE2ETest {
         }
     }
 
-    @Ignore // TODO(#28): init ブロック内の呼び出しがグラフに乗ったら有効化
     @Test
-    fun `changing warmUp detects testWarm via init block`() {
+    fun `changing warmUp detects all constructing tests via init block`() {
+        // init ブロックはインスタンス構築時に必ず実行されるため、
+        // 影響集合は「AppViewModel を構築する全テスト」になる (#28)
+        // warmUp ← <init>(initブロック帰属) ← AppViewModel(...) を呼ぶ全テスト
         withViewModelFixture { moduleFiles ->
             val diff = repositoryDiff(
                 line = 18,
@@ -145,7 +146,18 @@ class ViewModelIdiomE2ETest {
 
             val output = runPipeline(diff, moduleFiles)
 
-            assertEquals("io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testWarm", output)
+            assertEquals(
+                """
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testConfig
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testHandler
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testRefresh
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testStream
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testTitle
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testUiState
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testWarm
+                """.trimIndent(),
+                output
+            )
         }
     }
 

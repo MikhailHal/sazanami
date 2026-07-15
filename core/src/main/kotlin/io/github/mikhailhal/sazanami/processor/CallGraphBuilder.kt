@@ -8,8 +8,13 @@ import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtClassInitializer
+import org.jetbrains.kotlin.psi.KtClassOrObject
+import org.jetbrains.kotlin.psi.KtConstructor
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtImportDirective
@@ -34,9 +39,15 @@ import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
  *     (val uiState = build(...).stateIn(...)) の経路を追跡できる (#27)
  *
  * エッジの張り方:
- *   1. owner = 式を囲む最も近い非ローカル宣言 (関数 or プロパティ)
- *   2. target = Analysis API で解決した呼び出し先関数 / 参照先プロパティ
+ *   1. owner = 式を囲む最も近い非ローカル宣言 (関数 / プロパティ / コンストラクタ)
+ *   2. target = Analysis API で解決した呼び出し先関数 / 参照先プロパティ / コンストラクタ
  *   3. graph.addEdge(owner, target) で登録
+ *
+ * 既知の制限: プロパティ初期化子は構築時にも実行されるが、
+ * <init> → プロパティのエッジは意図的に張っていない。
+ * 「構築するだけで読まない」テストへの影響 (構築時の例外・副作用) は
+ * 参照エッジでは捕捉されない。選択の細かさを優先した判断で、
+ * 保守的モードの導入案は選択厳格度オプションのイシューを参照。
  */
 class CallGraphBuilder {
     private val graph = CallGraph()
@@ -75,6 +86,9 @@ class CallGraphBuilder {
 
     /**
      * 関数呼び出しを処理してグラフにエッジを追加
+     *
+     * コンストラクタ呼び出し (Foo()) は `<クラスFQN>.<init>` ノードへの
+     * エッジとして扱う。
      */
     private fun processCallExpression(expression: KtCallExpression, moduleName: ModuleName) {
         val owner = resolveOwnerNode(expression, moduleName) ?: return
@@ -85,11 +99,20 @@ class CallGraphBuilder {
             val functionSymbol = call?.singleFunctionCallOrNull()?.symbol
 
             if (functionSymbol != null) {
-                val calleeFqn = functionSymbol.callableId?.asSingleFqName()?.asString()
-                if (calleeFqn != null) {
-                    // calleeのisTestとmoduleNameはここでは不明だが、検索キーとしてしか使わない
-                    // 同一モジュール内の呼び出しと仮定
-                    val calleeNode = CallableNode.forLookup(calleeFqn, moduleName)
+                val calleeNode = when (functionSymbol) {
+                    is KaConstructorSymbol ->
+                        functionSymbol.containingClassId?.asSingleFqName()?.asString()?.let { classFqn ->
+                            CallableNode.forLookup("$classFqn.<init>", moduleName, NodeType.CONSTRUCTOR)
+                        }
+
+                    else ->
+                        functionSymbol.callableId?.asSingleFqName()?.asString()?.let { calleeFqn ->
+                            // calleeのisTestとmoduleNameはここでは不明だが、検索キーとしてしか使わない
+                            // 同一モジュール内の呼び出しと仮定
+                            CallableNode.forLookup(calleeFqn, moduleName)
+                        }
+                }
+                if (calleeNode != null) {
                     graph.addEdge(owner, calleeNode)
                 }
             }
@@ -170,6 +193,26 @@ class CallGraphBuilder {
                         return CallableNode(fqn, moduleName, isTest = false, nodeType = NodeType.PROPERTY)
                     }
                     // ローカル変数: FQNを持たないため、外側の宣言へ帰属を続ける
+                }
+
+                /**
+                 * init { warm = repository.warmUp() }  // initブロック → <クラスFQN>.<init>
+                 * constructor(x: Int) { setup(x) }     // secondaryコンストラクタ本体 → 同上
+                 *
+                 * primary/secondary/initブロックを1つの <init> ノードに集約する (#28)
+                 */
+                is KtClassInitializer, is KtConstructor<*> -> {
+                    val classFqn = (current as KtElement)
+                        .getParentOfType<KtClassOrObject>(strict = true)
+                        ?.fqName?.asString()
+                    if (classFqn != null) {
+                        return CallableNode(
+                            "$classFqn.<init>",
+                            moduleName,
+                            isTest = false,
+                            nodeType = NodeType.CONSTRUCTOR
+                        )
+                    }
                 }
             }
             current = current.parent
