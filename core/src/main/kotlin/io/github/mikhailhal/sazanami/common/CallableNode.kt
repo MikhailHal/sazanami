@@ -7,7 +7,8 @@ import java.util.Objects
  */
 enum class NodeType {
     FUNCTION,
-    PROPERTY
+    PROPERTY,
+    CONSTRUCTOR
 }
 
 /**
