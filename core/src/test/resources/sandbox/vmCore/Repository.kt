@@ -17,4 +17,6 @@ class Repository {
     fun processEvent(): Int = 1
     fun warmUp(): Int = 0
     fun reload(): String = "reloaded"
+    // loadStream: チェーン付きプロパティ初期化子経由 (#27)
+    fun loadStream(): String = "stream"
 }

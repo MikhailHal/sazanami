@@ -36,4 +36,10 @@ class AppViewModelTest {
         val viewModel = AppViewModel(Repository())
         viewModel.refresh()
     }
+
+    @Test
+    fun testStream() {
+        val viewModel = AppViewModel(Repository())
+        viewModel.stream
+    }
 }

@@ -71,6 +71,23 @@ class ViewModelIdiomE2ETest {
         }
     }
 
+    @Ignore // TODO(#27): チェーン付きプロパティ初期化子内の呼び出しがグラフに乗ったら有効化
+    @Test
+    fun `changing loadStream detects testStream via chained property initializer`() {
+        // stateIn/shareIn イディオムの形: val stream = buildStream(repository).stateInLike()
+        withViewModelFixture { moduleFiles ->
+            val diff = repositoryDiff(
+                line = 21,
+                before = "    fun loadStream(): String = \"stream\"",
+                after = "    fun loadStream(): String = \"stream\" // modified"
+            )
+
+            val output = runPipeline(diff, moduleFiles)
+
+            assertEquals("io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testStream", output)
+        }
+    }
+
     @Ignore // TODO(#28): by lazy デリゲート内の呼び出しがグラフに乗ったら有効化
     @Test
     fun `changing loadConfig detects testConfig via lazy delegate`() {

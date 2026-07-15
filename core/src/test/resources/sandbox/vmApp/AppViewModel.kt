@@ -25,6 +25,14 @@ class AppViewModel(private val repository: Repository) {
 
     // 通常の関数本体内の呼び出し (現行仕様で検出可能なコントロール)
     fun refresh(): String = repository.reload()
+
+    // stateIn/shareIn イディオムを模したチェーン付きプロパティ初期化子
+    val stream: String = buildStream(repository).stateInLike()
 }
 
 private fun buildUiState(repository: Repository): String = repository.load()
+
+private fun buildStream(repository: Repository): String = repository.loadStream()
+
+// stateIn/shareIn 風のチェーンを作るためのライブラリ非依存な拡張
+private fun <T> T.stateInLike(): T = this
