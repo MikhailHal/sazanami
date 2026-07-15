@@ -1,6 +1,6 @@
 package io.github.mikhailhal.sazanami.collector
 
-import io.github.mikhailhal.sazanami.common.FunctionFqn
+import io.github.mikhailhal.sazanami.common.CallableFqn
 import io.github.mikhailhal.sazanami.common.ModuleName
 
 /**
@@ -14,6 +14,6 @@ import io.github.mikhailhal.sazanami.common.ModuleName
  * @property moduleName 関数が属するモジュール名
  */
 data class ChangedFunction(
-    val fqn: FunctionFqn,
+    val fqn: CallableFqn,
     val moduleName: ModuleName
 )

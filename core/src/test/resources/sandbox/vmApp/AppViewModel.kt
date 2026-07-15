@@ -28,6 +28,10 @@ class AppViewModel(private val repository: Repository) {
 
     // stateIn/shareIn イディオムを模したチェーン付きプロパティ初期化子
     val stream: String = buildStream(repository).stateInLike()
+
+    // カスタム getter 内の呼び出し
+    val title: String
+        get() = repository.loadTitle()
 }
 
 private fun buildUiState(repository: Repository): String = repository.load()

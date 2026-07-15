@@ -42,4 +42,10 @@ class AppViewModelTest {
         val viewModel = AppViewModel(Repository())
         viewModel.stream
     }
+
+    @Test
+    fun testTitle() {
+        val viewModel = AppViewModel(Repository())
+        viewModel.title
+    }
 }

@@ -1,7 +1,7 @@
 package io.github.mikhailhal.sazanami.processor
 
 import io.github.mikhailhal.sazanami.collector.ChangedFunction
-import io.github.mikhailhal.sazanami.common.FunctionNode
+import io.github.mikhailhal.sazanami.common.CallableNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -12,15 +12,15 @@ class AffectedTestResolverTest {
     private val testModule = ":test"
 
     // Helper to create nodes
-    private fun node(fqn: String, isTest: Boolean = false) = FunctionNode(fqn, testModule, isTest)
-    private fun testNode(fqn: String) = FunctionNode(fqn, testModule, isTest = true)
+    private fun node(fqn: String, isTest: Boolean = false) = CallableNode(fqn, testModule, isTest)
+    private fun testNode(fqn: String) = CallableNode(fqn, testModule, isTest = true)
     private fun changed(fqn: String) = ChangedFunction(fqn, testModule)
 
     // === Basic detection ===
 
     @Test
     fun `direct caller is test function`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
@@ -32,7 +32,7 @@ class AffectedTestResolverTest {
     @Test
     fun `transitive detection through helper`() {
         // testHelper -> helperB -> Calculator.add
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(node("com.example.helperB"), node("com.example.Calculator.add"))
         graph.addEdge(testNode("com.example.CalculatorTest.testHelper"), node("com.example.helperB"))
 
@@ -44,7 +44,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `multiple tests affected`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
         graph.addEdge(testNode("com.example.CalculatorTest.testAddNegative"), node("com.example.Calculator.add"))
 
@@ -62,7 +62,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `multiple changed functions`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
         graph.addEdge(testNode("com.example.CalculatorTest.testMultiply"), node("com.example.Calculator.multiply"))
 
@@ -84,7 +84,7 @@ class AffectedTestResolverTest {
     fun `continues traversal after finding test function`() {
         // testA -> testB -> changed
         // Both should be detected because testA might call testB with different args
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.SomeTest.testB"), node("com.example.changed"))
         graph.addEdge(testNode("com.example.SomeTest.testA"), testNode("com.example.SomeTest.testB"))
 
@@ -104,7 +104,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `empty changed functions returns empty set`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
 
         val resolver = AffectedTestResolver(graph)
@@ -115,7 +115,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `changed function with no callers returns empty set`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
 
         val resolver = AffectedTestResolver(graph)
         val affected = resolver.findAffectedTests(setOf(changed("com.example.unused")))
@@ -126,7 +126,7 @@ class AffectedTestResolverTest {
     @Test
     fun `cycle in graph does not cause infinite loop`() {
         // a -> b -> c -> a (cycle)
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(node("b"), node("a"))
         graph.addEdge(node("c"), node("b"))
         graph.addEdge(node("a"), node("c"))
@@ -143,7 +143,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `function with isTest true is detected`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.Helper.testSomething"), node("com.example.foo"))
 
         val resolver = AffectedTestResolver(graph)
@@ -154,7 +154,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `function with isTest false is not in result`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(node("com.example.Helper.doSomething"), node("com.example.foo"))
 
         val resolver = AffectedTestResolver(graph)
@@ -165,7 +165,7 @@ class AffectedTestResolverTest {
 
     @Test
     fun `mixed test and non-test callers`() {
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Calculator.add"))
         graph.addEdge(node("com.example.Helper.helper"), node("com.example.Calculator.add"))
 
@@ -179,7 +179,7 @@ class AffectedTestResolverTest {
     @Test
     fun `helper function leads to test`() {
         // testAdd -> helper -> Calculator.add
-        val graph = ReverseDependencyGraph()
+        val graph = CallGraph()
         graph.addEdge(node("com.example.Helper.helper"), node("com.example.Calculator.add"))
         graph.addEdge(testNode("com.example.CalculatorTest.testAdd"), node("com.example.Helper.helper"))
 

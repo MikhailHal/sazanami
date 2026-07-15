@@ -5,7 +5,7 @@ import io.github.mikhailhal.sazanami.collector.ChangedFunctionCollector
 import io.github.mikhailhal.sazanami.common.ModuleName
 import io.github.mikhailhal.sazanami.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sazanami.processor.AffectedTestResolver
-import io.github.mikhailhal.sazanami.processor.GraphBuilder
+import io.github.mikhailhal.sazanami.processor.CallGraphBuilder
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaModule
 import org.jetbrains.kotlin.analysis.api.projectStructure.KaSourceModule
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
@@ -65,7 +65,7 @@ object Sazanami {
             val allKtFiles = moduleFiles.values.flatten()
             val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, modulePathMapping, projectRoot)
 
-            val graph = GraphBuilder().build(moduleFiles)
+            val graph = CallGraphBuilder().build(moduleFiles)
             return AffectedTestResolver(graph).findAffectedTests(changedFunctions)
         } finally {
             Disposer.dispose(projectDisposable)

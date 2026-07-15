@@ -19,4 +19,6 @@ class Repository {
     fun reload(): String = "reloaded"
     // loadStream: チェーン付きプロパティ初期化子経由 (#27)
     fun loadStream(): String = "stream"
+    // loadTitle: カスタムgetter経由 (#27)
+    fun loadTitle(): String = "title"
 }

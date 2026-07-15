@@ -5,7 +5,7 @@ import io.github.mikhailhal.sazanami.collector.ChangedFunctionCollector
 import io.github.mikhailhal.sazanami.common.ModuleName
 import io.github.mikhailhal.sazanami.emitter.AffectedTestEmitter
 import io.github.mikhailhal.sazanami.processor.AffectedTestResolver
-import io.github.mikhailhal.sazanami.processor.GraphBuilder
+import io.github.mikhailhal.sazanami.processor.CallGraphBuilder
 import org.jetbrains.kotlin.analysis.api.standalone.buildStandaloneAnalysisAPISession
 import org.jetbrains.kotlin.analysis.project.structure.builder.buildKtSourceModule
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
@@ -55,7 +55,6 @@ class ViewModelIdiomE2ETest {
         }
     }
 
-    @Ignore // TODO(#27): プロパティ初期化子内の呼び出しがグラフに乗ったら有効化
     @Test
     fun `changing load detects testUiState via property initializer`() {
         withViewModelFixture { moduleFiles ->
@@ -71,7 +70,6 @@ class ViewModelIdiomE2ETest {
         }
     }
 
-    @Ignore // TODO(#27): チェーン付きプロパティ初期化子内の呼び出しがグラフに乗ったら有効化
     @Test
     fun `changing loadStream detects testStream via chained property initializer`() {
         // stateIn/shareIn イディオムの形: val stream = buildStream(repository).stateInLike()
@@ -88,7 +86,6 @@ class ViewModelIdiomE2ETest {
         }
     }
 
-    @Ignore // TODO(#28): by lazy デリゲート内の呼び出しがグラフに乗ったら有効化
     @Test
     fun `changing loadConfig detects testConfig via lazy delegate`() {
         withViewModelFixture { moduleFiles ->
@@ -104,7 +101,6 @@ class ViewModelIdiomE2ETest {
         }
     }
 
-    @Ignore // TODO(#28): 格納ラムダ内の呼び出しがグラフに乗ったら有効化
     @Test
     fun `changing processEvent detects testHandler via stored lambda`() {
         withViewModelFixture { moduleFiles ->
@@ -117,6 +113,23 @@ class ViewModelIdiomE2ETest {
             val output = runPipeline(diff, moduleFiles)
 
             assertEquals("io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testHandler", output)
+        }
+    }
+
+    @Test
+    fun `changing loadTitle detects testTitle via custom getter`() {
+        // カスタム getter 本体はアクセサ(KtPropertyAccessor)の中だが、
+        // PSI走査でその親のプロパティ(title)に帰属することを担保する
+        withViewModelFixture { moduleFiles ->
+            val diff = repositoryDiff(
+                line = 23,
+                before = "    fun loadTitle(): String = \"title\"",
+                after = "    fun loadTitle(): String = \"title\" // modified"
+            )
+
+            val output = runPipeline(diff, moduleFiles)
+
+            assertEquals("io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testTitle", output)
         }
     }
 
@@ -157,7 +170,7 @@ class ViewModelIdiomE2ETest {
         val allKtFiles = moduleFiles.values.flatten()
         val changedFunctions = ChangedFunctionCollector().collect(diff, allKtFiles, pathMapping, projectRoot)
 
-        val graph = GraphBuilder().build(moduleFiles)
+        val graph = CallGraphBuilder().build(moduleFiles)
         val affectedTests = AffectedTestResolver(graph).findAffectedTests(changedFunctions)
 
         return AffectedTestEmitter.emit(affectedTests)

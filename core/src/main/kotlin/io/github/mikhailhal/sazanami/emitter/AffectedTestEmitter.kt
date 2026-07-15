@@ -1,6 +1,6 @@
 package io.github.mikhailhal.sazanami.emitter
 
-import io.github.mikhailhal.sazanami.common.FunctionFqn
+import io.github.mikhailhal.sazanami.common.CallableFqn
 import java.io.File
 
 /**
@@ -22,7 +22,7 @@ object AffectedTestEmitter {
     /**
      * 影響テスト一覧を文字列として出力
      */
-    fun emit(tests: Set<FunctionFqn>): String {
+    fun emit(tests: Set<CallableFqn>): String {
         return tests.sorted().joinToString("\n")
     }
 
@@ -32,7 +32,7 @@ object AffectedTestEmitter {
      * @param tests 影響テストのFQN集合
      * @param outputFile 出力先ファイル
      */
-    fun emitToFile(tests: Set<FunctionFqn>, outputFile: File) {
+    fun emitToFile(tests: Set<CallableFqn>, outputFile: File) {
         val content = emit(tests)
         outputFile.writeText(content)
     }
@@ -40,7 +40,7 @@ object AffectedTestEmitter {
     /**
      * 影響テスト一覧を標準出力に出力
      */
-    fun emitToStdout(tests: Set<FunctionFqn>) {
+    fun emitToStdout(tests: Set<CallableFqn>) {
         println(emit(tests))
     }
 }
