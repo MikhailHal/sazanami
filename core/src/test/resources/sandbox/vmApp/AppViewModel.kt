@@ -32,6 +32,18 @@ class AppViewModel(private val repository: Repository) {
     // カスタム getter 内の呼び出し
     val title: String
         get() = repository.loadTitle()
+
+    // 格納されたメソッド参照 (#37)
+    val refLoader: () -> String = repository::loadRef
+
+    // 引数位置のメソッド参照 (.map(::mapper) イディオム) (#37)
+    fun mapAll(): List<String> = listOf("a", "b").map(repository::transform)
+
+    // コンストラクタ参照 (#37)
+    val factory: () -> Repository = ::Repository
+
+    // プロパティ参照 (#37)
+    val labelRef = repository::label
 }
 
 private fun buildUiState(repository: Repository): String = repository.load()
