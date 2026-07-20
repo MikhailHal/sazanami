@@ -9,8 +9,11 @@ import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
 import org.jetbrains.kotlin.analysis.api.resolution.symbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaConstructorSymbol
+import org.jetbrains.kotlin.analysis.api.symbols.KaFunctionSymbol
 import org.jetbrains.kotlin.analysis.api.symbols.KaPropertySymbol
+import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtCallableReferenceExpression
 import org.jetbrains.kotlin.psi.KtClassInitializer
 import org.jetbrains.kotlin.psi.KtClassOrObject
 import org.jetbrains.kotlin.psi.KtConstructor
@@ -81,6 +84,11 @@ class CallGraphBuilder {
                 processNameReference(expression, moduleName)
                 super.visitSimpleNameExpression(expression)
             }
+
+            override fun visitCallableReferenceExpression(expression: KtCallableReferenceExpression) {
+                processCallableReference(expression, moduleName)
+                super.visitCallableReferenceExpression(expression)
+            }
         })
     }
 
@@ -147,6 +155,46 @@ class CallGraphBuilder {
                     val propertyNode = CallableNode.forLookup(propertyFqn, moduleName, NodeType.PROPERTY)
                     graph.addEdge(owner, propertyNode)
                 }
+            }
+        }
+    }
+
+    /**
+     * コーラブル参照 (::fn) を処理してグラフにエッジを追加 (#37)
+     *
+     * 例: val refLoader = repository::loadRef   → refLoader → loadRef
+     *     .map(PopulatedNewsResource::asExternalModel) → 囲む宣言 → asExternalModel
+     *     ::Repository (コンストラクタ参照)     → 囲む宣言 → Repository.<init>
+     *     repository::label (プロパティ参照)    → 囲む宣言 → label
+     *
+     * 参照は呼び出しを遅延させるだけで、参照先の変更は参照を実行する側に影響するため、
+     * 保守的に「呼び出しと同じエッジ」として扱う。
+     */
+    private fun processCallableReference(expression: KtCallableReferenceExpression, moduleName: ModuleName) {
+        val owner = resolveOwnerNode(expression, moduleName) ?: return
+
+        analyze(expression) {
+            val symbol = expression.callableReference.mainReference.resolveToSymbol()
+            val targetNode = when (symbol) {
+                is KaConstructorSymbol ->
+                    symbol.containingClassId?.asSingleFqName()?.asString()?.let { classFqn ->
+                        CallableNode.forLookup("$classFqn.<init>", moduleName, NodeType.CONSTRUCTOR)
+                    }
+
+                is KaPropertySymbol ->
+                    symbol.callableId?.asSingleFqName()?.asString()?.let { fqn ->
+                        CallableNode.forLookup(fqn, moduleName, NodeType.PROPERTY)
+                    }
+
+                is KaFunctionSymbol ->
+                    symbol.callableId?.asSingleFqName()?.asString()?.let { fqn ->
+                        CallableNode.forLookup(fqn, moduleName)
+                    }
+
+                else -> null
+            }
+            if (targetNode != null) {
+                graph.addEdge(owner, targetNode)
             }
         }
     }
