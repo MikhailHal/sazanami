@@ -16,6 +16,31 @@ class AffectedTestResolverTest {
     private fun testNode(fqn: String) = CallableNode(fqn, testModule, isTest = true)
     private fun changed(fqn: String) = ChangedFunction(fqn, testModule)
 
+    // === Changed test function selects itself (#44) ===
+
+    @Test
+    fun `changed test function selects itself even without callers`() {
+        // テスト関数には呼び出し元がいないため、変更された関数自体の判定が必要
+        val graph = CallGraph()
+        val resolver = AffectedTestResolver(graph)
+
+        val affected = resolver.findAffectedTests(
+            setOf(ChangedFunction("com.example.CalculatorTest.testAdd", testModule, isTest = true))
+        )
+
+        assertEquals(setOf("com.example.CalculatorTest.testAdd"), affected)
+    }
+
+    @Test
+    fun `changed non-test function does not select itself`() {
+        val graph = CallGraph()
+        val resolver = AffectedTestResolver(graph)
+
+        val affected = resolver.findAffectedTests(setOf(changed("com.example.Calculator.add")))
+
+        assertTrue(affected.isEmpty())
+    }
+
     // === Basic detection ===
 
     @Test

@@ -4,6 +4,7 @@ import com.intellij.psi.PsiElement
 import io.github.mikhailhal.sazanami.common.CallableNode
 import io.github.mikhailhal.sazanami.common.ModuleName
 import io.github.mikhailhal.sazanami.common.NodeType
+import io.github.mikhailhal.sazanami.common.hasTestAnnotation
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.analysis.api.resolution.singleFunctionCallOrNull
 import org.jetbrains.kotlin.analysis.api.resolution.singleVariableAccessCall
@@ -223,7 +224,7 @@ class CallGraphBuilder {
                 is KtNamedFunction -> {
                     val fqn = current.fqName?.asString()
                     if (fqn != null) {
-                        return CallableNode(fqn, moduleName, hasTestAnnotation(current))
+                        return CallableNode(fqn, moduleName, current.hasTestAnnotation())
                     }
                     // ローカル関数: FQNを持たないため、外側の宣言へ帰属を続ける
                 }
@@ -268,18 +269,4 @@ class CallGraphBuilder {
         return null
     }
 
-    /**
-     * 関数に@Testアノテーションが付与されているかを判定
-     *
-     * 対応アノテーション:
-     * - org.junit.Test (JUnit 4)
-     * - org.junit.jupiter.api.Test (JUnit 5)
-     * - kotlin.test.Test (kotlin-test)
-     */
-    private fun hasTestAnnotation(function: KtNamedFunction): Boolean {
-        return function.annotationEntries.any { annotation ->
-            val shortName = annotation.shortName?.asString()
-            shortName == "Test"
-        }
-    }
 }

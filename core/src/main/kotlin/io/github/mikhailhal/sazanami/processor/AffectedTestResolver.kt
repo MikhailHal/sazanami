@@ -58,6 +58,15 @@ class AffectedTestResolver(
         val affectedTests = mutableSetOf<CallableFqn>()
         val seen = mutableSetOf<CallableNode>()
 
+        /**
+         * 変更された関数自体がテストの場合、そのテストを影響テストに含める
+         *
+         * BFSは「変更された関数を呼んでいる関数」を辿るため、変更された関数自体は
+         * 判定対象にならない。テスト関数は通常どこからも呼ばれないので、
+         * この判定がないとテストを編集しても何も検出されない。
+         */
+        changedFunctions.filter { it.isTest }.forEach { affectedTests.add(it.fqn) }
+
         // ChangedFunctionをCallableNodeに変換してキューに入れる
         val queue = ArrayDeque(changedFunctions.map {
             CallableNode.forLookup(it.fqn, it.moduleName)

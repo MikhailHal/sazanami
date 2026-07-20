@@ -166,6 +166,26 @@ class E2ETest {
         }
     }
 
+    @Test
+    fun `changing a test function selects the test itself`() {
+        withSandboxFiles { ktFiles ->
+            // CalculatorTest.testAdd の本体を変更したdiff (#44)
+            val diff = """
+                diff --git a/src/test/resources/sandbox/CalculatorTest.kt b/src/test/resources/sandbox/CalculatorTest.kt
+                --- a/src/test/resources/sandbox/CalculatorTest.kt
+                +++ b/src/test/resources/sandbox/CalculatorTest.kt
+                @@ -12 +12 @@
+                -        calc.add(1, 2)
+                +        calc.add(1, 3)
+            """.trimIndent()
+
+            val output = runPipeline(diff, ktFiles)
+
+            // 変更されたテスト自身が影響テストとして返る
+            assertEquals("io.github.mikhailhal.sazanami.CalculatorTest.testAdd", output)
+        }
+    }
+
     // === Cross-module support tests ===
 
     @Test

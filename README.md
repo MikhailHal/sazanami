@@ -28,7 +28,7 @@
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.mikhailhal.sazanami") version "0.2.2"
+    id("io.github.mikhailhal.sazanami") version "0.2.3"
 }
 ```
 
