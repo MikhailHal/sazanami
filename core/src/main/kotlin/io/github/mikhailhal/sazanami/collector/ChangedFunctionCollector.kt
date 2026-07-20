@@ -3,6 +3,7 @@ package io.github.mikhailhal.sazanami.collector
 import com.intellij.openapi.editor.Document
 import com.intellij.psi.PsiDocumentManager
 import io.github.mikhailhal.sazanami.common.ModuleName
+import io.github.mikhailhal.sazanami.common.hasTestAnnotation
 import org.jetbrains.kotlin.analysis.api.analyze
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
@@ -110,7 +111,9 @@ class ChangedFunctionCollector {
                     getFunctionLineRange(function, document)?.let { functionRange ->
                         val isChangedFunction = fileDiff.overlapsWithRange(functionRange)
                         if (isChangedFunction) {
-                            changedFunctions.add(ChangedFunction(fqn, moduleName))
+                            // 変更された関数自体がテストなら、リゾルバが
+                            // その関数自身を影響テストに含められるようフラグを付与する
+                            changedFunctions.add(ChangedFunction(fqn, moduleName, function.hasTestAnnotation()))
                             // オーバーライド元（インターフェース/抽象クラス）のメソッドも追加
                             collectOverriddenMethods(function, moduleName, changedFunctions)
                         }
