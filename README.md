@@ -10,8 +10,6 @@
     <a href="#"><img src="https://img.shields.io/github/actions/workflow/status/MikhailHal/sazanami/ci.yml?style=flat-square&logo=github" alt="CI"></a>
     <!-- <a href="https://github.com/MikhailHal/sazanami/actions/workflows/check-ka-api.yml"><img src="https://img.shields.io/github/actions/workflow/status/MikhailHal/sazanami/check-ka-api.yml?style=flat-square&logo=kotlin&logoColor=white&label=KA%20API" alt="Kotlin Analysis API Status"></a> -->
   </p>
-</p>
-
 <br>
 
 **sazanami** analyzes your code changes and identifies which tests are affected, enabling faster feedback loops by running only the tests that matter.
@@ -30,7 +28,7 @@
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.mikhailhal.sazanami") version "0.2.1"
+    id("io.github.mikhailhal.sazanami") version "0.2.2"
 }
 ```
 
@@ -86,6 +84,45 @@ git diff --unified=0 HEAD~1 | ./core/build/install/core/bin/core --project .
 2. **Identify Changed Functions** — Map line changes to function FQNs using PSI
 3. **Build Call Graph** — Analyze all source files to build caller→callee relationships
 4. **Reverse Traverse** — Find all test functions that transitively call changed functions
+
+## Kotlin Analysis API: KaSymbol Cheat Sheet
+
+sazanami が扱う `KaSymbol` 階層の地図 (Analysis API 2.1.20 で検証済み)。
+「コード上のどの構文が、どのシンボル型に解決されるか」の対応表:
+
+```
+KaSymbol                                  ← 全シンボルの根
+└── KaDeclarationSymbol                   ← 宣言されたもの全般
+    ├── KaClassifierSymbol                ← 「型」を宣言する側
+    │   └── KaClassSymbol                 ── class Repository の宣言そのもの / 型位置の Repository
+    └── KaCallableSymbol                  ← 呼べる・参照できるもの (sazanami の主戦場)
+        │    共通API: callableId          → FQN取得 (コンストラクタ/ローカルは null)
+        │             allOverriddenSymbols → オーバーライド元を遡る (Collector が使用)
+        │
+        ├── KaFunctionSymbol
+        │   ├── KaNamedFunctionSymbol     ── repository.load() の load / repository::loadRef の loadRef
+        │   ├── KaConstructorSymbol       ── Repository() / ::Repository
+        │   │                                (callableId が null → containingClassId から <init> FQN を組む)
+        │   ├── KaAnonymousFunctionSymbol ── { it + 1 } (ラムダそれ自体)
+        │   └── KaPropertyAccessorSymbol
+        │       ├── KaPropertyGetterSymbol ── val title get() = ... の get()
+        │       └── KaPropertySetterSymbol ── var name set(v) {...} の set()
+        │
+        └── KaVariableSymbol
+            ├── KaPropertySymbol          ── val label = "ready" / viewModel.uiState / repository::label
+            ├── KaLocalVariableSymbol     ── fun f() { val x = 1; x } の x
+            └── KaParameterSymbol
+                └── KaValueParameterSymbol ── fun transform(input: String) の input
+```
+
+sazanami の解決入口と、返ってくるシンボル型の対応:
+
+| 解決入口 | 対象の構文 | 返ってくる型 |
+|---|---|---|
+| `resolveToCall().singleFunctionCallOrNull().symbol` | `load()` / `Repository()` | `KaNamedFunctionSymbol` / `KaConstructorSymbol` |
+| `resolveToCall().singleVariableAccessCall().symbol` | `viewModel.uiState` (参照) | `KaVariableSymbol` のいずれか |
+| `mainReference.resolveToSymbol()` | `::loadRef` / `::Repository` / `::label` | 上記すべての可能性 |
+| `symbol.allOverriddenSymbols` | 実装メソッド → インターフェース | `KaCallableSymbol` |
 
 ## Requirements
 

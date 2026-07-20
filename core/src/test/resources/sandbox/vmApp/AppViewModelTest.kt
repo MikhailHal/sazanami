@@ -48,4 +48,16 @@ class AppViewModelTest {
         val viewModel = AppViewModel(Repository())
         viewModel.title
     }
+
+    @Test
+    fun testRefLoader() {
+        val viewModel = AppViewModel(Repository())
+        viewModel.refLoader()
+    }
+
+    @Test
+    fun testMapAll() {
+        val viewModel = AppViewModel(Repository())
+        viewModel.mapAll()
+    }
 }

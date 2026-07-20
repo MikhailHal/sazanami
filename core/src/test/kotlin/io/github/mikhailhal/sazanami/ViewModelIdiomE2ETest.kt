@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import java.nio.file.Paths
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Android の ViewModel イディオムを模した E2E テスト (#30)
@@ -150,6 +151,8 @@ class ViewModelIdiomE2ETest {
                 """
                 io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testConfig
                 io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testHandler
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testMapAll
+                io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testRefLoader
                 io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testRefresh
                 io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testStream
                 io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testTitle
@@ -157,6 +160,59 @@ class ViewModelIdiomE2ETest {
                 io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testWarm
                 """.trimIndent(),
                 output
+            )
+        }
+    }
+
+    @Test
+    fun `changing loadRef detects testRefLoader via stored callable reference`() {
+        // val refLoader: () -> String = repository::loadRef (#37)
+        withViewModelFixture { moduleFiles ->
+            val diff = repositoryDiff(
+                line = 25,
+                before = "    fun loadRef(): String = \"ref\"",
+                after = "    fun loadRef(): String = \"ref\" // modified"
+            )
+
+            val output = runPipeline(diff, moduleFiles)
+
+            assertEquals("io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testRefLoader", output)
+        }
+    }
+
+    @Test
+    fun `changing transform detects testMapAll via argument-position callable reference`() {
+        // fun mapAll() = listOf("a", "b").map(repository::transform) (#37)
+        withViewModelFixture { moduleFiles ->
+            val diff = repositoryDiff(
+                line = 27,
+                before = "    fun transform(input: String): String = input + \"!\"",
+                after = "    fun transform(input: String): String = input + \"!\" // modified"
+            )
+
+            val output = runPipeline(diff, moduleFiles)
+
+            assertEquals("io.github.mikhailhal.sazanami.vmapp.AppViewModelTest.testMapAll", output)
+        }
+    }
+
+    @Test
+    fun `constructor and property references produce call-graph edges`() {
+        // ::Repository と repository::label はcollectorで駆動できない
+        // (コンストラクタ/プロパティ自体の変更検出は別問題) ため、エッジの存在を直接検証する (#37)
+        withViewModelFixture { moduleFiles ->
+            val graph = CallGraphBuilder().build(moduleFiles)
+
+            val initCallers = graph.getCallersByFqn("io.github.mikhailhal.sazanami.vmcore.Repository.<init>")
+            assertTrue(
+                initCallers.any { it.fqn == "io.github.mikhailhal.sazanami.vmapp.AppViewModel.factory" },
+                "factory プロパティの ::Repository 参照がエッジになっていない: $initCallers"
+            )
+
+            val labelCallers = graph.getCallersByFqn("io.github.mikhailhal.sazanami.vmcore.Repository.label")
+            assertTrue(
+                labelCallers.any { it.fqn == "io.github.mikhailhal.sazanami.vmapp.AppViewModel.labelRef" },
+                "labelRef プロパティの repository::label 参照がエッジになっていない: $labelCallers"
             )
         }
     }

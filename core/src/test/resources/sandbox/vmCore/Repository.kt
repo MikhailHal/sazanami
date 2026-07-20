@@ -21,4 +21,10 @@ class Repository {
     fun loadStream(): String = "stream"
     // loadTitle: カスタムgetter経由 (#27)
     fun loadTitle(): String = "title"
+    // loadRef: 格納されたメソッド参照経由 (#37)
+    fun loadRef(): String = "ref"
+    // transform: 引数位置のメソッド参照経由 (#37)
+    fun transform(input: String): String = input + "!"
+    // label: プロパティ参照経由 (#37)
+    val label: String = "ready"
 }
