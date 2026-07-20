@@ -10,8 +10,6 @@
     <a href="#"><img src="https://img.shields.io/github/actions/workflow/status/MikhailHal/sazanami/ci.yml?style=flat-square&logo=github" alt="CI"></a>
     <!-- <a href="https://github.com/MikhailHal/sazanami/actions/workflows/check-ka-api.yml"><img src="https://img.shields.io/github/actions/workflow/status/MikhailHal/sazanami/check-ka-api.yml?style=flat-square&logo=kotlin&logoColor=white&label=KA%20API" alt="Kotlin Analysis API Status"></a> -->
   </p>
-</p>
-
 <br>
 
 **sazanami** analyzes your code changes and identifies which tests are affected, enabling faster feedback loops by running only the tests that matter.
@@ -30,7 +28,7 @@
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("io.github.mikhailhal.sazanami") version "0.2.1"
+    id("io.github.mikhailhal.sazanami") version "0.2.2"
 }
 ```
 
